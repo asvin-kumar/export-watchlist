@@ -229,17 +229,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     
     // Check if we're on the correct page
     if (!isOnWatchlistPage()) {
-      // If on Netflix homepage, redirect to my-list page
-      if (hostname === 'www.netflix.com' || hostname.endsWith('.netflix.com')) {
-        window.location.href = 'https://www.netflix.com/browse/my-list';
-        sendResponse({ redirected: true, platform: 'Netflix', targetUrl: 'https://www.netflix.com/browse/my-list' });
-        return true;
-      }
-      
-      // For other platforms, return error
+      // Return error - background script will handle loading the page
       sendResponse({ 
         error: true, 
-        message: 'Please navigate to your watchlist page first',
+        message: 'Not on watchlist page',
         items: [] 
       });
       return true;

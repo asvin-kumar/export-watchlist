@@ -17,6 +17,72 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   });
   
+// Get watchlist URL for a platform
+function getWatchlistUrl(url) {
+  if (!url) return null;
+  try {
+    const urlObj = new URL(url);
+    const hostname = urlObj.hostname;
+    
+    if (hostname === 'www.netflix.com' || hostname.endsWith('.netflix.com')) {
+      return 'https://www.netflix.com/browse/my-list';
+    } else if (hostname === 'www.primevideo.com' || hostname.endsWith('.primevideo.com')) {
+      return 'https://www.primevideo.com/watchlist';
+    } else if (hostname === 'www.amazon.com' || hostname.endsWith('.amazon.com')) {
+      return 'https://www.amazon.com/gp/video/watchlist';
+    } else if (hostname === 'www.hulu.com' || hostname.endsWith('.hulu.com')) {
+      return 'https://www.hulu.com/my-stuff';
+    } else if (hostname === 'www.disneyplus.com' || hostname.endsWith('.disneyplus.com')) {
+      return 'https://www.disneyplus.com/watchlist';
+    }
+    
+    return null;
+  } catch (e) {
+    return null;
+  }
+}
+
+// Check if URL is on a watchlist page
+function isOnWatchlistPage(url) {
+  if (!url) return false;
+  try {
+    const urlObj = new URL(url);
+    const hostname = urlObj.hostname;
+    const pathname = urlObj.pathname;
+    
+    if (hostname === 'www.netflix.com' || hostname.endsWith('.netflix.com')) {
+      return pathname.includes('/browse/my-list');
+    } else if (hostname === 'www.primevideo.com' || hostname.endsWith('.primevideo.com') || 
+               hostname === 'www.amazon.com' || hostname.endsWith('.amazon.com')) {
+      return pathname.includes('/watchlist') || pathname.includes('/wl');
+    } else if (hostname === 'www.hulu.com' || hostname.endsWith('.hulu.com')) {
+      return pathname.includes('/my-stuff');
+    } else if (hostname === 'www.disneyplus.com' || hostname.endsWith('.disneyplus.com')) {
+      return pathname.includes('/watchlist');
+    }
+    
+    return false;
+  } catch (e) {
+    return false;
+  }
+}
+
+// Check if URL is a streaming site
+function isStreamingSite(url) {
+  if (!url) return false;
+  try {
+    const urlObj = new URL(url);
+    const hostname = urlObj.hostname;
+    const sites = ['netflix.com', 'primevideo.com', 'amazon.com', 'disneyplus.com', 'hulu.com'];
+    
+    return sites.some(site => 
+      hostname === `www.${site}` || hostname.endsWith(`.${site}`)
+    );
+  } catch (e) {
+    return false;
+  }
+}
+
   // Handle export button click
   exportBtn.addEventListener('click', async () => {
     exportBtn.disabled = true;
@@ -28,47 +94,106 @@ document.addEventListener('DOMContentLoaded', async () => {
       // Get active tab
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
       
-      // Send message to content script to extract data
-      const response = await chrome.tabs.sendMessage(tab.id, { action: 'extractWatchlist' });
-      
-      // Handle redirect
-      if (response && response.redirected) {
-        showStatus(`Redirecting to ${response.platform} watchlist page...`, 'info');
-        setTimeout(() => window.close(), 2000);
-        return;
-      }
-      
-      // Handle error
-      if (response && response.error) {
-        showStatus(response.message || 'Error extracting watchlist', 'error');
-        return;
-      }
-      
-      if (response && response.items && response.items.length > 0) {
-        const items = response.items;
-        const platform = response.platform || 'watchlist';
+      // Check if already on watchlist page
+      if (isOnWatchlistPage(tab.url)) {
+        // Extract directly from current page
+        const response = await chrome.tabs.sendMessage(tab.id, { action: 'extractWatchlist' });
         
-        // Convert to IMDB-compatible CSV
-        const csv = convertToIMDBCSV(items);
-        const filename = `${platform}-watchlist-${new Date().toISOString().split('T')[0]}.csv`;
+        if (response && response.items && response.items.length > 0) {
+          const items = response.items;
+          const platform = response.platform || 'watchlist';
+          
+          // Convert to IMDB-compatible CSV
+          const csv = convertToIMDBCSV(items);
+          const filename = `${platform}-watchlist-${new Date().toISOString().split('T')[0]}.csv`;
+          
+          // Download CSV
+          const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+          const url = URL.createObjectURL(blob);
+          
+          chrome.downloads.download({
+            url: url,
+            filename: filename,
+            saveAs: true
+          }, (downloadId) => {
+            if (chrome.runtime.lastError) {
+              showStatus('Error downloading file: ' + chrome.runtime.lastError.message, 'error');
+            } else {
+              showStatus(`Successfully exported ${items.length} items!`, 'success');
+            }
+          });
+        } else {
+          showStatus('No watchlist items found on this page.', 'error');
+        }
+      } else if (isStreamingSite(tab.url)) {
+        // Not on watchlist page, load it in background
+        const watchlistUrl = getWatchlistUrl(tab.url);
         
-        // Download CSV
-        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-        const url = URL.createObjectURL(blob);
-        
-        chrome.downloads.download({
-          url: url,
-          filename: filename,
-          saveAs: true
-        }, (downloadId) => {
-          if (chrome.runtime.lastError) {
-            showStatus('Error downloading file: ' + chrome.runtime.lastError.message, 'error');
-          } else {
-            showStatus(`Successfully exported ${items.length} items!`, 'success');
-          }
-        });
+        if (watchlistUrl) {
+          showStatus('Loading watchlist page in background...', 'info');
+          
+          // Create a new tab in the background
+          const newTab = await chrome.tabs.create({
+            url: watchlistUrl,
+            active: false
+          });
+          
+          // Wait for the tab to finish loading
+          await new Promise((resolve) => {
+            const listener = async (updatedTabId, changeInfo) => {
+              if (updatedTabId === newTab.id && changeInfo.status === 'complete') {
+                // Give it extra time to fully load content
+                setTimeout(async () => {
+                  try {
+                    showStatus('Extracting data from watchlist...', 'info');
+                    const response = await chrome.tabs.sendMessage(newTab.id, { action: 'extractWatchlist' });
+                    
+                    if (response && response.items && response.items.length > 0) {
+                      const items = response.items;
+                      const platform = response.platform || 'watchlist';
+                      
+                      // Convert to IMDB-compatible CSV
+                      const csv = convertToIMDBCSV(items);
+                      const filename = `${platform}-watchlist-${new Date().toISOString().split('T')[0]}.csv`;
+                      
+                      // Download CSV
+                      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+                      const url = URL.createObjectURL(blob);
+                      
+                      chrome.downloads.download({
+                        url: url,
+                        filename: filename,
+                        saveAs: true
+                      }, (downloadId) => {
+                        if (chrome.runtime.lastError) {
+                          showStatus('Error downloading file: ' + chrome.runtime.lastError.message, 'error');
+                        } else {
+                          showStatus(`Successfully exported ${items.length} items!`, 'success');
+                        }
+                      });
+                    } else {
+                      showStatus('No watchlist items found.', 'error');
+                    }
+                  } catch (e) {
+                    console.error('Error extracting from background tab:', e);
+                    showStatus('Error extracting watchlist data.', 'error');
+                  } finally {
+                    // Close the background tab
+                    chrome.tabs.remove(newTab.id);
+                    chrome.tabs.onUpdated.removeListener(listener);
+                    resolve();
+                  }
+                }, 2000);
+              }
+            };
+            
+            chrome.tabs.onUpdated.addListener(listener);
+          });
+        } else {
+          showStatus('Unable to determine watchlist URL.', 'error');
+        }
       } else {
-        showStatus('No watchlist items found on this page.', 'error');
+        showStatus('Please navigate to a supported streaming site.', 'error');
       }
     } catch (error) {
       console.error('Error:', error);
