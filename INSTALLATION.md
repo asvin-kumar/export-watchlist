@@ -29,8 +29,12 @@
 ### Test 2: Popup UI
 1. While on an unsupported site (e.g., google.com):
    - Click the extension icon
-   - ✓ You should see a message listing supported streaming sites
-2. While on a supported site (e.g., netflix.com):
+   - ✓ You should see a message listing supported streaming sites with clickable hyperlinks
+   - ✓ Click any platform link to navigate directly to its watchlist page
+2. While on a supported site but not on watchlist page (e.g., netflix.com home):
+   - Click the extension icon
+   - ✓ You should see a message to navigate to the watchlist page with a clickable link
+3. While on a watchlist page:
    - Click the extension icon
    - ✓ You should see an "Export Watchlist" button
 
@@ -53,6 +57,10 @@
 - **Prime Video**: www.primevideo.com, www.amazon.com
 - **Disney+**: www.disneyplus.com
 - **Hulu**: www.hulu.com
+- **Apple TV+**: tv.apple.com
+- **Max**: play.max.com
+- **Peacock**: www.peacocktv.com
+- **Paramount+**: www.paramountplus.com
 
 ## Expected CSV Output
 

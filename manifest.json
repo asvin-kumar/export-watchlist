@@ -14,7 +14,11 @@
     "https://www.primevideo.com/*",
     "https://www.amazon.com/*",
     "https://www.disneyplus.com/*",
-    "https://www.hulu.com/*"
+    "https://www.hulu.com/*",
+    "https://tv.apple.com/*",
+    "https://play.max.com/*",
+    "https://www.peacocktv.com/*",
+    "https://www.paramountplus.com/*"
   ],
   "background": {
     "service_worker": "background.js"
@@ -39,7 +43,11 @@
         "https://www.primevideo.com/*",
         "https://www.amazon.com/*",
         "https://www.disneyplus.com/*",
-        "https://www.hulu.com/*"
+        "https://www.hulu.com/*",
+        "https://tv.apple.com/*",
+        "https://play.max.com/*",
+        "https://www.peacocktv.com/*",
+        "https://www.paramountplus.com/*"
       ],
       "js": ["content.js"],
       "run_at": "document_idle"

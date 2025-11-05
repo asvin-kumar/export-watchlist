@@ -6,7 +6,11 @@ const STREAMING_SITES = [
   'primevideo.com',
   'amazon.com',
   'disneyplus.com',
-  'hulu.com'
+  'hulu.com',
+  'tv.apple.com',
+  'play.max.com',
+  'peacocktv.com',
+  'paramountplus.com'
 ];
 
 // Create context menu on installation
@@ -47,7 +51,7 @@ function isStreamingSite(url) {
     
     // Check if hostname matches our supported sites
     return STREAMING_SITES.some(site => 
-      hostname === `www.${site}` || hostname.endsWith(`.${site}`)
+      hostname === `www.${site}` || hostname.endsWith(`.${site}`) || hostname === site
     );
   } catch (e) {
     return false;
@@ -71,6 +75,14 @@ function isOnWatchlistPage(url) {
       return pathname.includes('/my-stuff');
     } else if (hostname === 'www.disneyplus.com' || hostname.endsWith('.disneyplus.com')) {
       return pathname.includes('/watchlist');
+    } else if (hostname === 'tv.apple.com' || hostname.endsWith('.apple.com')) {
+      return pathname.includes('/library');
+    } else if (hostname === 'play.max.com' || hostname.endsWith('.max.com')) {
+      return pathname.includes('/lists/watchlist');
+    } else if (hostname === 'www.peacocktv.com' || hostname.endsWith('.peacocktv.com')) {
+      return pathname.includes('/watch/my-stuff');
+    } else if (hostname === 'www.paramountplus.com' || hostname.endsWith('.paramountplus.com')) {
+      return pathname.includes('/account/watchlist');
     }
     
     return false;
@@ -161,6 +173,14 @@ function getWatchlistUrl(url) {
       return 'https://www.hulu.com/my-stuff';
     } else if (hostname === 'www.disneyplus.com' || hostname.endsWith('.disneyplus.com')) {
       return 'https://www.disneyplus.com/watchlist';
+    } else if (hostname === 'tv.apple.com' || hostname.endsWith('.apple.com')) {
+      return 'https://tv.apple.com/us/library';
+    } else if (hostname === 'play.max.com' || hostname.endsWith('.max.com')) {
+      return 'https://play.max.com/lists/watchlist';
+    } else if (hostname === 'www.peacocktv.com' || hostname.endsWith('.peacocktv.com')) {
+      return 'https://www.peacocktv.com/watch/my-stuff';
+    } else if (hostname === 'www.paramountplus.com' || hostname.endsWith('.paramountplus.com')) {
+      return 'https://www.paramountplus.com/account/watchlist';
     }
     
     return null;
