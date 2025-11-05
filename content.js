@@ -62,8 +62,8 @@ function getPlatformName() {
 }
 
 // Constants for scroll behavior
-const SCROLL_CHECK_INTERVAL = 1000; // Time between scroll attempts (ms)
-const SCROLL_WAIT_TIME = 800; // Time to wait after scroll for content to load (ms)
+const SCROLL_CHECK_INTERVAL = 250; // Time between scroll attempts (ms)
+const SCROLL_WAIT_TIME = 200; // Time to wait after scroll for content to load (ms)
 const MAX_SCROLL_ATTEMPTS = 100; // Maximum number of scroll attempts
 const MAX_UNCHANGED_ATTEMPTS = 5; // Stop after this many attempts with no change
 const FINAL_RENDER_DELAY = 500; // Final delay for pending renders (ms)

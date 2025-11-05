@@ -206,7 +206,7 @@ async function exportWatchlist(tabId) {
       const response = await chrome.tabs.sendMessage(tabId, { action: 'extractWatchlist' });
       
       if (response && response.items && response.items.length > 0) {
-        const csv = convertToIMDBCSV(response.items);
+        const csv = convertToSimpleCSV(response.items);
         const platform = response.platform || 'watchlist';
         const filename = `${platform}-watchlist-${new Date().toISOString().split('T')[0]}.csv`;
         downloadCSV(csv, filename);
@@ -247,12 +247,12 @@ function convertToCSV(data) {
   return csvRows.join('\n');
 }
 
-// Convert data to IMDB-compatible CSV format
-function convertToIMDBCSV(data) {
+// Convert data to Simple CSV format
+function convertToSimpleCSV(data) {
   if (!data || data.length === 0) return '';
   
-  // IMDB CSV format headers
-  const headers = ['Position', 'Const', 'Created', 'Modified', 'Description', 'Title', 'Title Type', 'Directors', 'You Rated', 'IMDb Rating', 'Runtime (mins)', 'Year', 'Genres', 'Num Votes', 'Release Date', 'URL'];
+  // Simple CSV format headers
+  const headers = ['Position', 'Title'];
   const csvRows = [];
   
   // Add header row
@@ -262,27 +262,12 @@ function convertToIMDBCSV(data) {
   for (let i = 0; i < data.length; i++) {
     const item = data[i];
     const position = i + 1;
-    const created = item.extractedDate || new Date().toISOString().split('T')[0];
     const title = item.title || '';
     
-    // Build CSV row with IMDB format
+    // Build CSV row
     const row = [
       position,                    // Position
-      '',                          // Const (IMDB ID - not available)
-      created,                     // Created
-      created,                     // Modified
-      `From ${item.platform}`,     // Description
-      escapeCSVValue(title),       // Title
-      '',                          // Title Type (movie/tvSeries - not available)
-      '',                          // Directors
-      '',                          // You Rated
-      '',                          // IMDb Rating
-      '',                          // Runtime (mins)
-      '',                          // Year
-      '',                          // Genres
-      '',                          // Num Votes
-      '',                          // Release Date
-      ''                           // URL
+      escapeCSVValue(title)        // Title
     ];
     
     csvRows.push(row.join(','));
