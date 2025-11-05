@@ -97,33 +97,38 @@ function isStreamingSite(url) {
       // Check if already on watchlist page
       if (isOnWatchlistPage(tab.url)) {
         // Extract directly from current page
-        const response = await chrome.tabs.sendMessage(tab.id, { action: 'extractWatchlist' });
-        
-        if (response && response.items && response.items.length > 0) {
-          const items = response.items;
-          const platform = response.platform || 'watchlist';
+        try {
+          const response = await chrome.tabs.sendMessage(tab.id, { action: 'extractWatchlist' });
           
-          // Convert to IMDB-compatible CSV
-          const csv = convertToIMDBCSV(items);
-          const filename = `${platform}-watchlist-${new Date().toISOString().split('T')[0]}.csv`;
-          
-          // Download CSV
-          const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-          const url = URL.createObjectURL(blob);
-          
-          chrome.downloads.download({
-            url: url,
-            filename: filename,
-            saveAs: true
-          }, (downloadId) => {
-            if (chrome.runtime.lastError) {
-              showStatus('Error downloading file: ' + chrome.runtime.lastError.message, 'error');
-            } else {
-              showStatus(`Successfully exported ${items.length} items!`, 'success');
-            }
-          });
-        } else {
-          showStatus('No watchlist items found on this page.', 'error');
+          if (response && response.items && response.items.length > 0) {
+            const items = response.items;
+            const platform = response.platform || 'watchlist';
+            
+            // Convert to IMDB-compatible CSV
+            const csv = convertToIMDBCSV(items);
+            const filename = `${platform}-watchlist-${new Date().toISOString().split('T')[0]}.csv`;
+            
+            // Download CSV
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            
+            chrome.downloads.download({
+              url: url,
+              filename: filename,
+              saveAs: true
+            }, (downloadId) => {
+              if (chrome.runtime.lastError) {
+                showStatus('Error downloading file: ' + chrome.runtime.lastError.message, 'error');
+              } else {
+                showStatus(`Successfully exported ${items.length} items!`, 'success');
+              }
+            });
+          } else {
+            showStatus('No watchlist items found on this page.', 'error');
+          }
+        } catch (e) {
+          console.error('Error sending message to content script:', e);
+          showStatus('Error: ' + e.message, 'error');
         }
       } else if (isStreamingSite(tab.url)) {
         // Not on watchlist page, load it in background
@@ -183,7 +188,7 @@ function isStreamingSite(url) {
                     chrome.tabs.onUpdated.removeListener(listener);
                     resolve();
                   }
-                }, 2000);
+                }, 5000);
               }
             };
             

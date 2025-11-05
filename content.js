@@ -46,7 +46,9 @@ async function scrollToLoadAll() {
   return new Promise((resolve) => {
     let lastHeight = document.body.scrollHeight;
     let scrollAttempts = 0;
-    const maxScrollAttempts = 50; // Prevent infinite loops
+    let unchangedAttempts = 0;
+    const maxScrollAttempts = 100; // Increased to handle larger watchlists
+    const maxUnchangedAttempts = 5; // Stop after 5 consecutive attempts with no change
     
     const scrollInterval = setInterval(() => {
       // Scroll to bottom
@@ -57,17 +59,25 @@ async function scrollToLoadAll() {
         const newHeight = document.body.scrollHeight;
         scrollAttempts++;
         
-        // Stop if no new content loaded or max attempts reached
-        if (newHeight === lastHeight || scrollAttempts >= maxScrollAttempts) {
+        // Check if height changed
+        if (newHeight === lastHeight) {
+          unchangedAttempts++;
+        } else {
+          unchangedAttempts = 0; // Reset counter if content loaded
+        }
+        
+        // Stop if no new content loaded for several attempts or max attempts reached
+        if (unchangedAttempts >= maxUnchangedAttempts || scrollAttempts >= maxScrollAttempts) {
           clearInterval(scrollInterval);
           // Scroll back to top
           window.scrollTo(0, 0);
-          resolve();
+          // Give a final moment for any pending renders
+          setTimeout(() => resolve(), 500);
         }
         
         lastHeight = newHeight;
-      }, 500);
-    }, 600);
+      }, 800); // Increased wait time to 800ms to allow more time for lazy loading
+    }, 1000); // Increased interval to 1000ms for better stability
   });
 }
 
