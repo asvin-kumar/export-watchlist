@@ -100,42 +100,19 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 // Export watchlist from current tab
 async function exportWatchlist(tabId) {
   try {
-    const results = await chrome.scripting.executeScript({
-      target: { tabId },
-      func: extractWatchlist
-    });
+    // Send message to content script to extract data
+    const response = await chrome.tabs.sendMessage(tabId, { action: 'extractWatchlist' });
     
-    if (results && results[0] && results[0].result) {
-      const data = results[0].result;
-      if (data.length > 0) {
-        const csv = convertToCSV(data);
-        const filename = `watchlist-${new Date().toISOString().split('T')[0]}.csv`;
-        downloadCSV(csv, filename);
-      } else {
-        console.log('No watchlist items found');
-      }
+    if (response && response.items && response.items.length > 0) {
+      const csv = convertToCSV(response.items);
+      const filename = `watchlist-${new Date().toISOString().split('T')[0]}.csv`;
+      downloadCSV(csv, filename);
+    } else {
+      console.log('No watchlist items found');
     }
   } catch (e) {
     console.error('Error exporting watchlist:', e);
   }
-}
-
-// Function injected into page to extract watchlist
-function extractWatchlist() {
-  const hostname = window.location.hostname;
-  let items = [];
-  
-  if (hostname.includes('netflix.com')) {
-    items = extractNetflixWatchlist();
-  } else if (hostname.includes('primevideo.com') || hostname.includes('amazon.com')) {
-    items = extractPrimeVideoWatchlist();
-  } else if (hostname.includes('disneyplus.com')) {
-    items = extractDisneyPlusWatchlist();
-  } else if (hostname.includes('hulu.com')) {
-    items = extractHuluWatchlist();
-  }
-  
-  return items;
 }
 
 // Convert data to CSV format

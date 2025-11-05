@@ -3,6 +3,7 @@
 // Extract Netflix watchlist
 function extractNetflixWatchlist() {
   const items = [];
+  const seenTitles = new Set();
   
   // Netflix My List page selectors
   const titleCards = document.querySelectorAll('.title-card, .slider-item, [class*="title"], [class*="card"]');
@@ -16,7 +17,8 @@ function extractNetflixWatchlist() {
         const title = titleElement ? titleElement.textContent.trim() : imgElement?.alt || 'Unknown';
         const imageUrl = imgElement?.src || '';
         
-        if (title && title !== 'Unknown') {
+        if (title && title !== 'Unknown' && !seenTitles.has(title)) {
+          seenTitles.add(title);
           items.push({
             title: title,
             type: 'Movie/Show',
@@ -37,6 +39,7 @@ function extractNetflixWatchlist() {
 // Extract Prime Video watchlist
 function extractPrimeVideoWatchlist() {
   const items = [];
+  const seenTitles = new Set();
   
   // Prime Video watchlist selectors
   const titleCards = document.querySelectorAll('[data-card-title], .av-hover-wrapper, [class*="card"]');
@@ -50,7 +53,8 @@ function extractPrimeVideoWatchlist() {
       const title = titleAttr || titleElement?.textContent.trim() || imgElement?.alt || '';
       const imageUrl = imgElement?.src || '';
       
-      if (title) {
+      if (title && !seenTitles.has(title)) {
+        seenTitles.add(title);
         items.push({
           title: title,
           type: 'Movie/Show',
@@ -70,6 +74,7 @@ function extractPrimeVideoWatchlist() {
 // Extract Disney+ watchlist
 function extractDisneyPlusWatchlist() {
   const items = [];
+  const seenTitles = new Set();
   
   // Disney+ watchlist selectors
   const titleCards = document.querySelectorAll('[class*="card"], [data-testid*="set-item"]');
@@ -82,7 +87,8 @@ function extractDisneyPlusWatchlist() {
       const title = titleElement?.textContent?.trim() || imgElement?.alt || '';
       const imageUrl = imgElement?.src || '';
       
-      if (title) {
+      if (title && !seenTitles.has(title)) {
+        seenTitles.add(title);
         items.push({
           title: title,
           type: 'Movie/Show',
@@ -102,6 +108,7 @@ function extractDisneyPlusWatchlist() {
 // Extract Hulu watchlist
 function extractHuluWatchlist() {
   const items = [];
+  const seenTitles = new Set();
   
   // Hulu watchlist selectors
   const titleCards = document.querySelectorAll('[class*="card"], [class*="masthead"]');
@@ -114,7 +121,8 @@ function extractHuluWatchlist() {
       const title = titleElement?.textContent?.trim() || imgElement?.alt || '';
       const imageUrl = imgElement?.src || '';
       
-      if (title) {
+      if (title && !seenTitles.has(title)) {
+        seenTitles.add(title);
         items.push({
           title: title,
           type: 'Movie/Show',

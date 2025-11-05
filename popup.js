@@ -28,40 +28,33 @@ document.addEventListener('DOMContentLoaded', async () => {
       // Get active tab
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
       
-      // Execute content script to extract data
-      const results = await chrome.scripting.executeScript({
-        target: { tabId: tab.id },
-        func: extractWatchlistData
-      });
+      // Send message to content script to extract data
+      const response = await chrome.tabs.sendMessage(tab.id, { action: 'extractWatchlist' });
       
-      if (results && results[0] && results[0].result) {
-        const items = results[0].result;
+      if (response && response.items && response.items.length > 0) {
+        const items = response.items;
         
-        if (items.length > 0) {
-          // Convert to CSV
-          const csv = convertToCSV(items);
-          const filename = `watchlist-${new Date().toISOString().split('T')[0]}.csv`;
-          
-          // Download CSV
-          const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-          const url = URL.createObjectURL(blob);
-          
-          chrome.downloads.download({
-            url: url,
-            filename: filename,
-            saveAs: true
-          }, (downloadId) => {
-            if (chrome.runtime.lastError) {
-              showStatus('Error downloading file: ' + chrome.runtime.lastError.message, 'error');
-            } else {
-              showStatus(`Successfully exported ${items.length} items!`, 'success');
-            }
-          });
-        } else {
-          showStatus('No watchlist items found on this page.', 'error');
-        }
+        // Convert to CSV
+        const csv = convertToCSV(items);
+        const filename = `watchlist-${new Date().toISOString().split('T')[0]}.csv`;
+        
+        // Download CSV
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        
+        chrome.downloads.download({
+          url: url,
+          filename: filename,
+          saveAs: true
+        }, (downloadId) => {
+          if (chrome.runtime.lastError) {
+            showStatus('Error downloading file: ' + chrome.runtime.lastError.message, 'error');
+          } else {
+            showStatus(`Successfully exported ${items.length} items!`, 'success');
+          }
+        });
       } else {
-        showStatus('Could not extract watchlist data.', 'error');
+        showStatus('No watchlist items found on this page.', 'error');
       }
     } catch (error) {
       console.error('Error:', error);
@@ -72,147 +65,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   });
 });
-
-// Function to extract watchlist data (injected into page)
-function extractWatchlistData() {
-  const hostname = window.location.hostname;
-  let items = [];
-  
-  if (hostname.includes('netflix.com')) {
-    items = extractNetflixWatchlist();
-  } else if (hostname.includes('primevideo.com') || hostname.includes('amazon.com')) {
-    items = extractPrimeVideoWatchlist();
-  } else if (hostname.includes('disneyplus.com')) {
-    items = extractDisneyPlusWatchlist();
-  } else if (hostname.includes('hulu.com')) {
-    items = extractHuluWatchlist();
-  }
-  
-  return items;
-  
-  // Extract Netflix watchlist
-  function extractNetflixWatchlist() {
-    const items = [];
-    const titleCards = document.querySelectorAll('.title-card, .slider-item, [class*="title"], [class*="card"]');
-    
-    titleCards.forEach(card => {
-      try {
-        const titleElement = card.querySelector('.fallback-text, .video-title, [class*="title"]');
-        const imgElement = card.querySelector('img');
-        
-        if (titleElement || imgElement) {
-          const title = titleElement ? titleElement.textContent.trim() : imgElement?.alt || 'Unknown';
-          const imageUrl = imgElement?.src || '';
-          
-          if (title && title !== 'Unknown' && !items.some(item => item.title === title)) {
-            items.push({
-              title: title,
-              type: 'Movie/Show',
-              platform: 'Netflix',
-              imageUrl: imageUrl,
-              extractedDate: new Date().toISOString().split('T')[0]
-            });
-          }
-        }
-      } catch (e) {
-        console.error('Error extracting Netflix item:', e);
-      }
-    });
-    
-    return items;
-  }
-  
-  // Extract Prime Video watchlist
-  function extractPrimeVideoWatchlist() {
-    const items = [];
-    const titleCards = document.querySelectorAll('[data-card-title], .av-hover-wrapper, [class*="card"]');
-    
-    titleCards.forEach(card => {
-      try {
-        const titleAttr = card.getAttribute('data-card-title');
-        const titleElement = card.querySelector('[class*="title"], h3, h2');
-        const imgElement = card.querySelector('img');
-        
-        const title = titleAttr || titleElement?.textContent.trim() || imgElement?.alt || '';
-        const imageUrl = imgElement?.src || '';
-        
-        if (title && !items.some(item => item.title === title)) {
-          items.push({
-            title: title,
-            type: 'Movie/Show',
-            platform: 'Prime Video',
-            imageUrl: imageUrl,
-            extractedDate: new Date().toISOString().split('T')[0]
-          });
-        }
-      } catch (e) {
-        console.error('Error extracting Prime Video item:', e);
-      }
-    });
-    
-    return items;
-  }
-  
-  // Extract Disney+ watchlist
-  function extractDisneyPlusWatchlist() {
-    const items = [];
-    const titleCards = document.querySelectorAll('[class*="card"], [data-testid*="set-item"]');
-    
-    titleCards.forEach(card => {
-      try {
-        const titleElement = card.querySelector('[class*="title"], img');
-        const imgElement = card.querySelector('img');
-        
-        const title = titleElement?.textContent?.trim() || imgElement?.alt || '';
-        const imageUrl = imgElement?.src || '';
-        
-        if (title && !items.some(item => item.title === title)) {
-          items.push({
-            title: title,
-            type: 'Movie/Show',
-            platform: 'Disney+',
-            imageUrl: imageUrl,
-            extractedDate: new Date().toISOString().split('T')[0]
-          });
-        }
-      } catch (e) {
-        console.error('Error extracting Disney+ item:', e);
-      }
-    });
-    
-    return items;
-  }
-  
-  // Extract Hulu watchlist
-  function extractHuluWatchlist() {
-    const items = [];
-    const titleCards = document.querySelectorAll('[class*="card"], [class*="masthead"]');
-    
-    titleCards.forEach(card => {
-      try {
-        const titleElement = card.querySelector('[class*="title"], h3, h2, img');
-        const imgElement = card.querySelector('img');
-        
-        const title = titleElement?.textContent?.trim() || imgElement?.alt || '';
-        const imageUrl = imgElement?.src || '';
-        
-        if (title && !items.some(item => item.title === title)) {
-          items.push({
-            title: title,
-            type: 'Movie/Show',
-            platform: 'Hulu',
-            imageUrl: imageUrl,
-            extractedDate: new Date().toISOString().split('T')[0]
-          });
-        }
-      } catch (e) {
-        console.error('Error extracting Hulu item:', e);
-      }
-    });
-    
-    return items;
-  }
-}
 
 // Convert data to CSV format
 function convertToCSV(data) {
