@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Watchlist Exporter</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="container">
+    <h1>Watchlist Exporter</h1>
+    <div id="content">
+      <div id="supported-site" class="hidden">
+        <p class="site-info">Click the button below to export your watchlist from this streaming service.</p>
+        <button id="export-btn" class="btn-primary">Export Watchlist</button>
+        <div id="status" class="status hidden"></div>
+      </div>
+      <div id="unsupported-site" class="hidden">
+        <p class="warning">This extension only works on:</p>
+        <ul class="site-list">
+          <li>Netflix</li>
+          <li>Prime Video</li>
+          <li>Disney+</li>
+          <li>Hulu</li>
+        </ul>
+        <p class="info">Please navigate to one of these streaming services to export your watchlist.</p>
+      </div>
+    </div>
+  </div>
+  <script src="popup.js"></script>
+</body>
+</html>
