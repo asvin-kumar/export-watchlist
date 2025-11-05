@@ -8,6 +8,10 @@ A cross-browser extension (Chrome, Firefox, Safari) that extracts and exports yo
 - Prime Video (Amazon)
 - Disney+
 - Hulu
+- Apple TV+
+- Max
+- Peacock
+- Paramount+
 
 ## Features
 
@@ -42,7 +46,7 @@ A cross-browser extension (Chrome, Firefox, Safari) that extracts and exports yo
 
 ## How to Use
 
-1. Navigate to one of the supported streaming platforms (Netflix, Prime Video, Disney+, or Hulu)
+1. Navigate to one of the supported streaming platforms (Netflix, Prime Video, Disney+, Hulu, Apple TV+, Max, Peacock, or Paramount+)
 2. Go to your watchlist/My List page
 3. Click the extension icon in your browser toolbar
 4. Click "Export Watchlist" button
@@ -51,6 +55,15 @@ A cross-browser extension (Chrome, Firefox, Safari) that extracts and exports yo
 ### Alternative: Context Menu
 - Right-click anywhere on a supported streaming site
 - Select "Export Watchlist to CSV" from the context menu
+
+## Screenshots
+
+The extension features an intuitive interface with helpful guidance:
+- **Clickable platform links** when on unsupported sites - directs users to watchlist pages
+- Clear navigation instructions when on the right platform but wrong page
+- One-click export when on a watchlist page
+
+See the [`screenshots/`](screenshots/) folder for detailed UI examples that can be used for publishing to browser extension stores.
 
 ## CSV Output Format
 
