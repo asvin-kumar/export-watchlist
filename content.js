@@ -145,13 +145,15 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     const hostname = window.location.hostname;
     let items = [];
     
-    if (hostname.includes('netflix.com')) {
+    // Use endsWith to ensure we're on the actual domain, not a subdomain with the name embedded
+    if (hostname === 'www.netflix.com' || hostname.endsWith('.netflix.com')) {
       items = extractNetflixWatchlist();
-    } else if (hostname.includes('primevideo.com') || hostname.includes('amazon.com')) {
+    } else if (hostname === 'www.primevideo.com' || hostname.endsWith('.primevideo.com') || 
+               hostname === 'www.amazon.com' || hostname.endsWith('.amazon.com')) {
       items = extractPrimeVideoWatchlist();
-    } else if (hostname.includes('disneyplus.com')) {
+    } else if (hostname === 'www.disneyplus.com' || hostname.endsWith('.disneyplus.com')) {
       items = extractDisneyPlusWatchlist();
-    } else if (hostname.includes('hulu.com')) {
+    } else if (hostname === 'www.hulu.com' || hostname.endsWith('.hulu.com')) {
       items = extractHuluWatchlist();
     }
     

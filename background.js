@@ -41,7 +41,12 @@ function isStreamingSite(url) {
   if (!url) return false;
   try {
     const urlObj = new URL(url);
-    return STREAMING_SITES.some(site => urlObj.hostname.includes(site));
+    const hostname = urlObj.hostname;
+    
+    // Check if hostname matches our supported sites
+    return STREAMING_SITES.some(site => 
+      hostname === `www.${site}` || hostname.endsWith(`.${site}`)
+    );
   } catch (e) {
     return false;
   }
