@@ -15,6 +15,14 @@
         <button id="export-btn" class="btn-primary">Export Watchlist</button>
         <div id="status" class="status hidden"></div>
       </div>
+      <div id="navigate-message" class="hidden">
+        <p class="warning">You need to navigate to your watchlist page first.</p>
+        <p class="info">Please go to your <span class="platform-name">streaming platform</span> watchlist page and try exporting from there:</p>
+        <p class="watchlist-url-container">
+          <a href="#" class="watchlist-link" target="_blank"></a>
+        </p>
+        <p class="info-note">Opening the watchlist in a background tab doesn't work properly due to lazy loading. Please navigate there manually, then click the export button.</p>
+      </div>
       <div id="unsupported-site" class="hidden">
         <p class="warning">This extension only works on:</p>
         <ul class="site-list">

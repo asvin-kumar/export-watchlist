@@ -175,71 +175,26 @@ async function exportWatchlist(tabId) {
     const currentTab = await chrome.tabs.get(tabId);
     const currentUrl = currentTab.url;
     
-    // Check if already on watchlist page
-    if (isOnWatchlistPage(currentUrl)) {
-      // Extract directly from current page
-      try {
-        const response = await chrome.tabs.sendMessage(tabId, { action: 'extractWatchlist' });
-        
-        if (response && response.items && response.items.length > 0) {
-          const csv = convertToIMDBCSV(response.items);
-          const platform = response.platform || 'watchlist';
-          const filename = `${platform}-watchlist-${new Date().toISOString().split('T')[0]}.csv`;
-          downloadCSV(csv, filename);
-        } else {
-          console.log('No watchlist items found');
-        }
-      } catch (e) {
-        console.error('Error sending message to content script:', e);
-        // If message fails, it might be because content script isn't ready
-        // This can happen if the page just loaded
-      }
-    } else if (isStreamingSite(currentUrl)) {
-      // Not on watchlist page, but on a streaming site
-      // Load watchlist page in background
-      const watchlistUrl = getWatchlistUrl(currentUrl);
+    // Check if on watchlist page
+    if (!isOnWatchlistPage(currentUrl)) {
+      console.log('Not on watchlist page. User should navigate there first.');
+      return;
+    }
+    
+    // Extract directly from current page
+    try {
+      const response = await chrome.tabs.sendMessage(tabId, { action: 'extractWatchlist' });
       
-      if (watchlistUrl) {
-        console.log('Loading watchlist page in background:', watchlistUrl);
-        
-        // Create a new tab in the background
-        const newTab = await chrome.tabs.create({
-          url: watchlistUrl,
-          active: false // Keep it in the background
-        });
-        
-        // Wait for the tab to finish loading and for content to be extracted
-        await new Promise((resolve) => {
-          const listener = async (updatedTabId, changeInfo) => {
-            if (updatedTabId === newTab.id && changeInfo.status === 'complete') {
-              // Give it extra time to fully load content and lazy-load items
-              setTimeout(async () => {
-                try {
-                  const response = await chrome.tabs.sendMessage(newTab.id, { action: 'extractWatchlist' });
-                  
-                  if (response && response.items && response.items.length > 0) {
-                    const csv = convertToIMDBCSV(response.items);
-                    const platform = response.platform || 'watchlist';
-                    const filename = `${platform}-watchlist-${new Date().toISOString().split('T')[0]}.csv`;
-                    downloadCSV(csv, filename);
-                  } else {
-                    console.log('No watchlist items found');
-                  }
-                } catch (e) {
-                  console.error('Error extracting from background tab:', e);
-                } finally {
-                  // Close the background tab
-                  chrome.tabs.remove(newTab.id);
-                  chrome.tabs.onUpdated.removeListener(listener);
-                  resolve();
-                }
-              }, 5000); // Increased to 5 seconds to allow more time for initial render
-            }
-          };
-          
-          chrome.tabs.onUpdated.addListener(listener);
-        });
+      if (response && response.items && response.items.length > 0) {
+        const csv = convertToIMDBCSV(response.items);
+        const platform = response.platform || 'watchlist';
+        const filename = `${platform}-watchlist-${new Date().toISOString().split('T')[0]}.csv`;
+        downloadCSV(csv, filename);
+      } else {
+        console.log('No watchlist items found');
       }
+    } catch (e) {
+      console.error('Error sending message to content script:', e);
     }
   } catch (e) {
     console.error('Error exporting watchlist:', e);
