@@ -41,12 +41,19 @@ function getPlatformName() {
   return 'watchlist';
 }
 
+// Constants for scroll behavior
+const SCROLL_CHECK_INTERVAL = 1000; // Time between scroll attempts (ms)
+const SCROLL_WAIT_TIME = 800; // Time to wait after scroll for content to load (ms)
+const MAX_SCROLL_ATTEMPTS = 100; // Maximum number of scroll attempts
+const MAX_UNCHANGED_ATTEMPTS = 5; // Stop after this many attempts with no change
+const FINAL_RENDER_DELAY = 500; // Final delay for pending renders (ms)
+
 // Scroll to load all lazy-loaded content
 async function scrollToLoadAll() {
   return new Promise((resolve) => {
     let lastHeight = document.body.scrollHeight;
     let scrollAttempts = 0;
-    const maxScrollAttempts = 50; // Prevent infinite loops
+    let unchangedAttempts = 0;
     
     const scrollInterval = setInterval(() => {
       // Scroll to bottom
@@ -57,17 +64,25 @@ async function scrollToLoadAll() {
         const newHeight = document.body.scrollHeight;
         scrollAttempts++;
         
-        // Stop if no new content loaded or max attempts reached
-        if (newHeight === lastHeight || scrollAttempts >= maxScrollAttempts) {
+        // Check if height changed
+        if (newHeight === lastHeight) {
+          unchangedAttempts++;
+        } else {
+          unchangedAttempts = 0; // Reset counter if content loaded
+        }
+        
+        // Stop if no new content loaded for several attempts or max attempts reached
+        if (unchangedAttempts >= MAX_UNCHANGED_ATTEMPTS || scrollAttempts >= MAX_SCROLL_ATTEMPTS) {
           clearInterval(scrollInterval);
           // Scroll back to top
           window.scrollTo(0, 0);
-          resolve();
+          // Give a final moment for any pending renders
+          setTimeout(() => resolve(), FINAL_RENDER_DELAY);
         }
         
         lastHeight = newHeight;
-      }, 500);
-    }, 600);
+      }, SCROLL_WAIT_TIME);
+    }, SCROLL_CHECK_INTERVAL);
   });
 }
 

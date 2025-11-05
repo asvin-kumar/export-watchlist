@@ -178,15 +178,21 @@ async function exportWatchlist(tabId) {
     // Check if already on watchlist page
     if (isOnWatchlistPage(currentUrl)) {
       // Extract directly from current page
-      const response = await chrome.tabs.sendMessage(tabId, { action: 'extractWatchlist' });
-      
-      if (response && response.items && response.items.length > 0) {
-        const csv = convertToIMDBCSV(response.items);
-        const platform = response.platform || 'watchlist';
-        const filename = `${platform}-watchlist-${new Date().toISOString().split('T')[0]}.csv`;
-        downloadCSV(csv, filename);
-      } else {
-        console.log('No watchlist items found');
+      try {
+        const response = await chrome.tabs.sendMessage(tabId, { action: 'extractWatchlist' });
+        
+        if (response && response.items && response.items.length > 0) {
+          const csv = convertToIMDBCSV(response.items);
+          const platform = response.platform || 'watchlist';
+          const filename = `${platform}-watchlist-${new Date().toISOString().split('T')[0]}.csv`;
+          downloadCSV(csv, filename);
+        } else {
+          console.log('No watchlist items found');
+        }
+      } catch (e) {
+        console.error('Error sending message to content script:', e);
+        // If message fails, it might be because content script isn't ready
+        // This can happen if the page just loaded
       }
     } else if (isStreamingSite(currentUrl)) {
       // Not on watchlist page, but on a streaming site
@@ -206,7 +212,7 @@ async function exportWatchlist(tabId) {
         await new Promise((resolve) => {
           const listener = async (updatedTabId, changeInfo) => {
             if (updatedTabId === newTab.id && changeInfo.status === 'complete') {
-              // Give it extra time to fully load content
+              // Give it extra time to fully load content and lazy-load items
               setTimeout(async () => {
                 try {
                   const response = await chrome.tabs.sendMessage(newTab.id, { action: 'extractWatchlist' });
@@ -227,7 +233,7 @@ async function exportWatchlist(tabId) {
                   chrome.tabs.onUpdated.removeListener(listener);
                   resolve();
                 }
-              }, 2000); // Wait 2 seconds after page loads
+              }, 5000); // Increased to 5 seconds to allow more time for initial render
             }
           };
           
