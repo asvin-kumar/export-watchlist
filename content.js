@@ -1,7 +1,81 @@
 // Content script to extract watchlist data from streaming sites
 
+// Check if we're on the correct page for each platform
+function isOnWatchlistPage() {
+  const hostname = window.location.hostname;
+  const pathname = window.location.pathname;
+  
+  if (hostname === 'www.netflix.com' || hostname.endsWith('.netflix.com')) {
+    // Netflix: must be on /browse/my-list page
+    return pathname.includes('/browse/my-list');
+  } else if (hostname === 'www.primevideo.com' || hostname.endsWith('.primevideo.com') || 
+             hostname === 'www.amazon.com' || hostname.endsWith('.amazon.com')) {
+    // Prime Video: must be on watchlist page
+    return pathname.includes('/watchlist') || pathname.includes('/wl');
+  } else if (hostname === 'www.hulu.com' || hostname.endsWith('.hulu.com')) {
+    // Hulu: must be on my-stuff page
+    return pathname.includes('/my-stuff');
+  } else if (hostname === 'www.disneyplus.com' || hostname.endsWith('.disneyplus.com')) {
+    // Disney+: must be on watchlist page
+    return pathname.includes('/watchlist');
+  }
+  
+  return false;
+}
+
+// Get platform name from hostname
+function getPlatformName() {
+  const hostname = window.location.hostname;
+  
+  if (hostname === 'www.netflix.com' || hostname.endsWith('.netflix.com')) {
+    return 'netflix';
+  } else if (hostname === 'www.primevideo.com' || hostname.endsWith('.primevideo.com') || 
+             hostname === 'www.amazon.com' || hostname.endsWith('.amazon.com')) {
+    return 'amazon';
+  } else if (hostname === 'www.hulu.com' || hostname.endsWith('.hulu.com')) {
+    return 'hulu';
+  } else if (hostname === 'www.disneyplus.com' || hostname.endsWith('.disneyplus.com')) {
+    return 'disney';
+  }
+  
+  return 'watchlist';
+}
+
+// Scroll to load all lazy-loaded content
+async function scrollToLoadAll() {
+  return new Promise((resolve) => {
+    let lastHeight = document.body.scrollHeight;
+    let scrollAttempts = 0;
+    const maxScrollAttempts = 50; // Prevent infinite loops
+    
+    const scrollInterval = setInterval(() => {
+      // Scroll to bottom
+      window.scrollTo(0, document.body.scrollHeight);
+      
+      // Wait a bit for content to load
+      setTimeout(() => {
+        const newHeight = document.body.scrollHeight;
+        scrollAttempts++;
+        
+        // Stop if no new content loaded or max attempts reached
+        if (newHeight === lastHeight || scrollAttempts >= maxScrollAttempts) {
+          clearInterval(scrollInterval);
+          // Scroll back to top
+          window.scrollTo(0, 0);
+          resolve();
+        }
+        
+        lastHeight = newHeight;
+      }, 500);
+    }, 600);
+  });
+}
+
 // Extract Netflix watchlist
-function extractNetflixWatchlist() {
+async function extractNetflixWatchlist() {
+  // Wait for lazy-loaded content
+  await scrollToLoadAll();
+  
   const items = [];
   const seenTitles = new Set();
   
@@ -37,7 +111,10 @@ function extractNetflixWatchlist() {
 }
 
 // Extract Prime Video watchlist
-function extractPrimeVideoWatchlist() {
+async function extractPrimeVideoWatchlist() {
+  // Wait for lazy-loaded content
+  await scrollToLoadAll();
+  
   const items = [];
   const seenTitles = new Set();
   
@@ -72,7 +149,10 @@ function extractPrimeVideoWatchlist() {
 }
 
 // Extract Disney+ watchlist
-function extractDisneyPlusWatchlist() {
+async function extractDisneyPlusWatchlist() {
+  // Wait for lazy-loaded content
+  await scrollToLoadAll();
+  
   const items = [];
   const seenTitles = new Set();
   
@@ -106,16 +186,19 @@ function extractDisneyPlusWatchlist() {
 }
 
 // Extract Hulu watchlist
-function extractHuluWatchlist() {
+async function extractHuluWatchlist() {
+  // Wait for lazy-loaded content
+  await scrollToLoadAll();
+  
   const items = [];
   const seenTitles = new Set();
   
-  // Hulu watchlist selectors
-  const titleCards = document.querySelectorAll('[class*="card"], [class*="masthead"]');
+  // Hulu my-stuff page selectors - updated for better compatibility
+  const titleCards = document.querySelectorAll('[class*="card"], [class*="masthead"], [class*="tile"], [data-automationid*="card"]');
   
   titleCards.forEach(card => {
     try {
-      const titleElement = card.querySelector('[class*="title"], h3, h2, img');
+      const titleElement = card.querySelector('[class*="title"], h3, h2, h4, img, [class*="name"]');
       const imgElement = card.querySelector('img');
       
       const title = titleElement?.textContent?.trim() || imgElement?.alt || '';
@@ -143,21 +226,58 @@ function extractHuluWatchlist() {
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === 'extractWatchlist') {
     const hostname = window.location.hostname;
-    let items = [];
     
-    // Use endsWith to ensure we're on the actual domain, not a subdomain with the name embedded
-    if (hostname === 'www.netflix.com' || hostname.endsWith('.netflix.com')) {
-      items = extractNetflixWatchlist();
-    } else if (hostname === 'www.primevideo.com' || hostname.endsWith('.primevideo.com') || 
-               hostname === 'www.amazon.com' || hostname.endsWith('.amazon.com')) {
-      items = extractPrimeVideoWatchlist();
-    } else if (hostname === 'www.disneyplus.com' || hostname.endsWith('.disneyplus.com')) {
-      items = extractDisneyPlusWatchlist();
-    } else if (hostname === 'www.hulu.com' || hostname.endsWith('.hulu.com')) {
-      items = extractHuluWatchlist();
+    // Check if we're on the correct page
+    if (!isOnWatchlistPage()) {
+      // If on Netflix homepage, redirect to my-list page
+      if (hostname === 'www.netflix.com' || hostname.endsWith('.netflix.com')) {
+        window.location.href = 'https://www.netflix.com/browse/my-list';
+        sendResponse({ redirected: true, platform: 'Netflix', targetUrl: 'https://www.netflix.com/browse/my-list' });
+        return true;
+      }
+      
+      // For other platforms, return error
+      sendResponse({ 
+        error: true, 
+        message: 'Please navigate to your watchlist page first',
+        items: [] 
+      });
+      return true;
     }
     
-    sendResponse({ items: items });
+    // Extract items based on platform (now all async)
+    const extractPromise = (async () => {
+      let items = [];
+      
+      if (hostname === 'www.netflix.com' || hostname.endsWith('.netflix.com')) {
+        items = await extractNetflixWatchlist();
+      } else if (hostname === 'www.primevideo.com' || hostname.endsWith('.primevideo.com') || 
+                 hostname === 'www.amazon.com' || hostname.endsWith('.amazon.com')) {
+        items = await extractPrimeVideoWatchlist();
+      } else if (hostname === 'www.disneyplus.com' || hostname.endsWith('.disneyplus.com')) {
+        items = await extractDisneyPlusWatchlist();
+      } else if (hostname === 'www.hulu.com' || hostname.endsWith('.hulu.com')) {
+        items = await extractHuluWatchlist();
+      }
+      
+      return items;
+    })();
+    
+    extractPromise.then(items => {
+      sendResponse({ 
+        items: items,
+        platform: getPlatformName()
+      });
+    }).catch(error => {
+      console.error('Error extracting watchlist:', error);
+      sendResponse({ 
+        error: true,
+        message: error.message,
+        items: [] 
+      });
+    });
+    
+    return true; // Keep message channel open for async response
   }
   return true;
 });

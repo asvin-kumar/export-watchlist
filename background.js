@@ -28,11 +28,13 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
 // Update icon based on current tab
 chrome.tabs.onActivated.addListener(async (activeInfo) => {
   updateIcon(activeInfo.tabId);
+  updateContextMenu(activeInfo.tabId);
 });
 
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   if (changeInfo.status === 'complete') {
     updateIcon(tabId);
+    updateContextMenu(tabId);
   }
 });
 
@@ -49,6 +51,46 @@ function isStreamingSite(url) {
     );
   } catch (e) {
     return false;
+  }
+}
+
+// Function to check if URL is on a watchlist page
+function isOnWatchlistPage(url) {
+  if (!url) return false;
+  try {
+    const urlObj = new URL(url);
+    const hostname = urlObj.hostname;
+    const pathname = urlObj.pathname;
+    
+    if (hostname === 'www.netflix.com' || hostname.endsWith('.netflix.com')) {
+      return pathname.includes('/browse/my-list');
+    } else if (hostname === 'www.primevideo.com' || hostname.endsWith('.primevideo.com') || 
+               hostname === 'www.amazon.com' || hostname.endsWith('.amazon.com')) {
+      return pathname.includes('/watchlist') || pathname.includes('/wl');
+    } else if (hostname === 'www.hulu.com' || hostname.endsWith('.hulu.com')) {
+      return pathname.includes('/my-stuff');
+    } else if (hostname === 'www.disneyplus.com' || hostname.endsWith('.disneyplus.com')) {
+      return pathname.includes('/watchlist');
+    }
+    
+    return false;
+  } catch (e) {
+    return false;
+  }
+}
+
+// Update context menu based on current page
+async function updateContextMenu(tabId) {
+  try {
+    const tab = await chrome.tabs.get(tabId);
+    const isWatchlistPage = isOnWatchlistPage(tab.url);
+    
+    // Update context menu to only show on watchlist pages
+    chrome.contextMenus.update('export-watchlist', {
+      enabled: isWatchlistPage
+    });
+  } catch (e) {
+    console.error('Error updating context menu:', e);
   }
 }
 
@@ -108,9 +150,22 @@ async function exportWatchlist(tabId) {
     // Send message to content script to extract data
     const response = await chrome.tabs.sendMessage(tabId, { action: 'extractWatchlist' });
     
+    // Handle redirect response
+    if (response && response.redirected) {
+      console.log(`Redirecting to ${response.platform} watchlist page...`);
+      return;
+    }
+    
+    // Handle error response
+    if (response && response.error) {
+      console.error('Error:', response.message);
+      return;
+    }
+    
     if (response && response.items && response.items.length > 0) {
-      const csv = convertToCSV(response.items);
-      const filename = `watchlist-${new Date().toISOString().split('T')[0]}.csv`;
+      const csv = convertToIMDBCSV(response.items);
+      const platform = response.platform || 'watchlist';
+      const filename = `${platform}-watchlist-${new Date().toISOString().split('T')[0]}.csv`;
       downloadCSV(csv, filename);
     } else {
       console.log('No watchlist items found');
@@ -144,6 +199,60 @@ function convertToCSV(data) {
   }
   
   return csvRows.join('\n');
+}
+
+// Convert data to IMDB-compatible CSV format
+function convertToIMDBCSV(data) {
+  if (!data || data.length === 0) return '';
+  
+  // IMDB CSV format headers
+  const headers = ['Position', 'Const', 'Created', 'Modified', 'Description', 'Title', 'Title Type', 'Directors', 'You Rated', 'IMDb Rating', 'Runtime (mins)', 'Year', 'Genres', 'Num Votes', 'Release Date', 'URL'];
+  const csvRows = [];
+  
+  // Add header row
+  csvRows.push(headers.join(','));
+  
+  // Add data rows
+  for (let i = 0; i < data.length; i++) {
+    const item = data[i];
+    const position = i + 1;
+    const created = item.extractedDate || new Date().toISOString().split('T')[0];
+    const title = item.title || '';
+    
+    // Build CSV row with IMDB format
+    const row = [
+      position,                    // Position
+      '',                          // Const (IMDB ID - not available)
+      created,                     // Created
+      created,                     // Modified
+      `From ${item.platform}`,     // Description
+      escapeCSVValue(title),       // Title
+      '',                          // Title Type (movie/tvSeries - not available)
+      '',                          // Directors
+      '',                          // You Rated
+      '',                          // IMDb Rating
+      '',                          // Runtime (mins)
+      '',                          // Year
+      '',                          // Genres
+      '',                          // Num Votes
+      '',                          // Release Date
+      ''                           // URL
+    ];
+    
+    csvRows.push(row.join(','));
+  }
+  
+  return csvRows.join('\n');
+}
+
+// Escape CSV value
+function escapeCSVValue(value) {
+  if (!value) return '';
+  const stringValue = String(value);
+  const escaped = stringValue.replace(/"/g, '""');
+  return escaped.includes(',') || escaped.includes('"') || escaped.includes('\n') 
+    ? `"${escaped}"` 
+    : escaped;
 }
 
 // Download CSV file

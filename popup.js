@@ -31,12 +31,26 @@ document.addEventListener('DOMContentLoaded', async () => {
       // Send message to content script to extract data
       const response = await chrome.tabs.sendMessage(tab.id, { action: 'extractWatchlist' });
       
+      // Handle redirect
+      if (response && response.redirected) {
+        showStatus(`Redirecting to ${response.platform} watchlist page...`, 'info');
+        setTimeout(() => window.close(), 2000);
+        return;
+      }
+      
+      // Handle error
+      if (response && response.error) {
+        showStatus(response.message || 'Error extracting watchlist', 'error');
+        return;
+      }
+      
       if (response && response.items && response.items.length > 0) {
         const items = response.items;
+        const platform = response.platform || 'watchlist';
         
-        // Convert to CSV
-        const csv = convertToCSV(items);
-        const filename = `watchlist-${new Date().toISOString().split('T')[0]}.csv`;
+        // Convert to IMDB-compatible CSV
+        const csv = convertToIMDBCSV(items);
+        const filename = `${platform}-watchlist-${new Date().toISOString().split('T')[0]}.csv`;
         
         // Download CSV
         const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
@@ -90,6 +104,60 @@ function convertToCSV(data) {
   }
   
   return csvRows.join('\n');
+}
+
+// Convert data to IMDB-compatible CSV format
+function convertToIMDBCSV(data) {
+  if (!data || data.length === 0) return '';
+  
+  // IMDB CSV format headers
+  const headers = ['Position', 'Const', 'Created', 'Modified', 'Description', 'Title', 'Title Type', 'Directors', 'You Rated', 'IMDb Rating', 'Runtime (mins)', 'Year', 'Genres', 'Num Votes', 'Release Date', 'URL'];
+  const csvRows = [];
+  
+  // Add header row
+  csvRows.push(headers.join(','));
+  
+  // Add data rows
+  for (let i = 0; i < data.length; i++) {
+    const item = data[i];
+    const position = i + 1;
+    const created = item.extractedDate || new Date().toISOString().split('T')[0];
+    const title = item.title || '';
+    
+    // Build CSV row with IMDB format
+    const row = [
+      position,                    // Position
+      '',                          // Const (IMDB ID - not available)
+      created,                     // Created
+      created,                     // Modified
+      `From ${item.platform}`,     // Description
+      escapeCSVValue(title),       // Title
+      '',                          // Title Type (movie/tvSeries - not available)
+      '',                          // Directors
+      '',                          // You Rated
+      '',                          // IMDb Rating
+      '',                          // Runtime (mins)
+      '',                          // Year
+      '',                          // Genres
+      '',                          // Num Votes
+      '',                          // Release Date
+      ''                           // URL
+    ];
+    
+    csvRows.push(row.join(','));
+  }
+  
+  return csvRows.join('\n');
+}
+
+// Escape CSV value
+function escapeCSVValue(value) {
+  if (!value) return '';
+  const stringValue = String(value);
+  const escaped = stringValue.replace(/"/g, '""');
+  return escaped.includes(',') || escaped.includes('"') || escaped.includes('\n') 
+    ? `"${escaped}"` 
+    : escaped;
 }
 
 // Show status message
