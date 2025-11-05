@@ -18,6 +18,18 @@ function isOnWatchlistPage() {
   } else if (hostname === 'www.disneyplus.com' || hostname.endsWith('.disneyplus.com')) {
     // Disney+: must be on watchlist page
     return pathname.includes('/watchlist');
+  } else if (hostname === 'tv.apple.com' || hostname.endsWith('.apple.com')) {
+    // Apple TV+: must be on library page
+    return pathname.includes('/library');
+  } else if (hostname === 'play.max.com' || hostname.endsWith('.max.com')) {
+    // Max: must be on watchlist page
+    return pathname.includes('/lists/watchlist');
+  } else if (hostname === 'www.peacocktv.com' || hostname.endsWith('.peacocktv.com')) {
+    // Peacock: must be on my-stuff page
+    return pathname.includes('/watch/my-stuff');
+  } else if (hostname === 'www.paramountplus.com' || hostname.endsWith('.paramountplus.com')) {
+    // Paramount+: must be on watchlist page
+    return pathname.includes('/account/watchlist');
   }
   
   return false;
@@ -36,6 +48,14 @@ function getPlatformName() {
     return 'hulu';
   } else if (hostname === 'www.disneyplus.com' || hostname.endsWith('.disneyplus.com')) {
     return 'disney';
+  } else if (hostname === 'tv.apple.com' || hostname.endsWith('.apple.com')) {
+    return 'appletv';
+  } else if (hostname === 'play.max.com' || hostname.endsWith('.max.com')) {
+    return 'max';
+  } else if (hostname === 'www.peacocktv.com' || hostname.endsWith('.peacocktv.com')) {
+    return 'peacock';
+  } else if (hostname === 'www.paramountplus.com' || hostname.endsWith('.paramountplus.com')) {
+    return 'paramount';
   }
   
   return 'watchlist';
@@ -237,6 +257,154 @@ async function extractHuluWatchlist() {
   return items;
 }
 
+// Extract Apple TV+ watchlist
+async function extractAppleTVWatchlist() {
+  // Wait for lazy-loaded content
+  await scrollToLoadAll();
+  
+  const items = [];
+  const seenTitles = new Set();
+  
+  // Apple TV+ library page selectors
+  const titleCards = document.querySelectorAll('[class*="shelf-grid-item"], [class*="canvas-lockup"], [data-metrics-loc*="shelfItem"]');
+  
+  titleCards.forEach(card => {
+    try {
+      const titleElement = card.querySelector('[class*="title"], [class*="label"], img');
+      const imgElement = card.querySelector('img');
+      
+      const title = titleElement?.textContent?.trim() || imgElement?.alt || '';
+      const imageUrl = imgElement?.src || '';
+      
+      if (title && !seenTitles.has(title)) {
+        seenTitles.add(title);
+        items.push({
+          title: title,
+          type: 'Movie/Show',
+          platform: 'Apple TV+',
+          imageUrl: imageUrl,
+          extractedDate: new Date().toISOString().split('T')[0]
+        });
+      }
+    } catch (e) {
+      console.error('Error extracting Apple TV+ item:', e);
+    }
+  });
+  
+  return items;
+}
+
+// Extract Max watchlist
+async function extractMaxWatchlist() {
+  // Wait for lazy-loaded content
+  await scrollToLoadAll();
+  
+  const items = [];
+  const seenTitles = new Set();
+  
+  // Max watchlist selectors
+  const titleCards = document.querySelectorAll('[class*="card"], [class*="tile"], [data-testid*="card"]');
+  
+  titleCards.forEach(card => {
+    try {
+      const titleElement = card.querySelector('[class*="title"], h3, h2, img');
+      const imgElement = card.querySelector('img');
+      
+      const title = titleElement?.textContent?.trim() || imgElement?.alt || '';
+      const imageUrl = imgElement?.src || '';
+      
+      if (title && !seenTitles.has(title)) {
+        seenTitles.add(title);
+        items.push({
+          title: title,
+          type: 'Movie/Show',
+          platform: 'Max',
+          imageUrl: imageUrl,
+          extractedDate: new Date().toISOString().split('T')[0]
+        });
+      }
+    } catch (e) {
+      console.error('Error extracting Max item:', e);
+    }
+  });
+  
+  return items;
+}
+
+// Extract Peacock watchlist
+async function extractPeacockWatchlist() {
+  // Wait for lazy-loaded content
+  await scrollToLoadAll();
+  
+  const items = [];
+  const seenTitles = new Set();
+  
+  // Peacock my-stuff page selectors
+  const titleCards = document.querySelectorAll('[class*="tile"], [class*="card"], [data-testid*="tile"]');
+  
+  titleCards.forEach(card => {
+    try {
+      const titleElement = card.querySelector('[class*="title"], h3, h2, img');
+      const imgElement = card.querySelector('img');
+      
+      const title = titleElement?.textContent?.trim() || imgElement?.alt || '';
+      const imageUrl = imgElement?.src || '';
+      
+      if (title && !seenTitles.has(title)) {
+        seenTitles.add(title);
+        items.push({
+          title: title,
+          type: 'Movie/Show',
+          platform: 'Peacock',
+          imageUrl: imageUrl,
+          extractedDate: new Date().toISOString().split('T')[0]
+        });
+      }
+    } catch (e) {
+      console.error('Error extracting Peacock item:', e);
+    }
+  });
+  
+  return items;
+}
+
+// Extract Paramount+ watchlist
+async function extractParamountPlusWatchlist() {
+  // Wait for lazy-loaded content
+  await scrollToLoadAll();
+  
+  const items = [];
+  const seenTitles = new Set();
+  
+  // Paramount+ watchlist selectors
+  const titleCards = document.querySelectorAll('[class*="tile"], [class*="card"], [data-testid*="card"]');
+  
+  titleCards.forEach(card => {
+    try {
+      const titleElement = card.querySelector('[class*="title"], h3, h2, img');
+      const imgElement = card.querySelector('img');
+      
+      const title = titleElement?.textContent?.trim() || imgElement?.alt || '';
+      const imageUrl = imgElement?.src || '';
+      
+      if (title && !seenTitles.has(title)) {
+        seenTitles.add(title);
+        items.push({
+          title: title,
+          type: 'Movie/Show',
+          platform: 'Paramount+',
+          imageUrl: imageUrl,
+          extractedDate: new Date().toISOString().split('T')[0]
+        });
+      }
+    } catch (e) {
+      console.error('Error extracting Paramount+ item:', e);
+    }
+  });
+  
+  return items;
+}
+
 // Listen for messages from background script
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === 'extractWatchlist') {
@@ -266,6 +434,14 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         items = await extractDisneyPlusWatchlist();
       } else if (hostname === 'www.hulu.com' || hostname.endsWith('.hulu.com')) {
         items = await extractHuluWatchlist();
+      } else if (hostname === 'tv.apple.com' || hostname.endsWith('.apple.com')) {
+        items = await extractAppleTVWatchlist();
+      } else if (hostname === 'play.max.com' || hostname.endsWith('.max.com')) {
+        items = await extractMaxWatchlist();
+      } else if (hostname === 'www.peacocktv.com' || hostname.endsWith('.peacocktv.com')) {
+        items = await extractPeacockWatchlist();
+      } else if (hostname === 'www.paramountplus.com' || hostname.endsWith('.paramountplus.com')) {
+        items = await extractParamountPlusWatchlist();
       }
       
       return items;
