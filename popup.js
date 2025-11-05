@@ -141,29 +141,38 @@ document.addEventListener('DOMContentLoaded', async () => {
   const unsupportedSiteDiv = document.getElementById('unsupported-site');
   const statusDiv = document.getElementById('status');
   
-  // Check if current site is supported
-  chrome.runtime.sendMessage({ action: 'checkSite' }, (response) => {
-    if (response && response.isSupported) {
-      // Check if we're on the actual watchlist page
-      if (isOnWatchlistPage(response.url)) {
-        supportedSiteDiv.classList.remove('hidden');
-        unsupportedSiteDiv.classList.add('hidden');
-        document.getElementById('navigate-message').classList.add('hidden');
+  // Check if current site is supported by querying the active tab directly
+  try {
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      const tab = tabs && tabs[0];
+      const url = tab?.url || '';
+      const supported = isStreamingSite(url);
+
+      if (supported) {
+        if (isOnWatchlistPage(url)) {
+          supportedSiteDiv.classList.remove('hidden');
+          unsupportedSiteDiv.classList.add('hidden');
+          document.getElementById('navigate-message').classList.add('hidden');
+        } else {
+          // On a streaming site but not on watchlist page
+          supportedSiteDiv.classList.add('hidden');
+          unsupportedSiteDiv.classList.add('hidden');
+          document.getElementById('navigate-message').classList.remove('hidden');
+          // Update the message with platform-specific watchlist URL
+          updateNavigateMessage(url);
+        }
       } else {
-        // On a streaming site but not on watchlist page
         supportedSiteDiv.classList.add('hidden');
-        unsupportedSiteDiv.classList.add('hidden');
-        document.getElementById('navigate-message').classList.remove('hidden');
-        
-        // Update the message with platform-specific watchlist URL
-        updateNavigateMessage(response.url);
+        unsupportedSiteDiv.classList.remove('hidden');
+        document.getElementById('navigate-message').classList.add('hidden');
       }
-    } else {
-      supportedSiteDiv.classList.add('hidden');
-      unsupportedSiteDiv.classList.remove('hidden');
-      document.getElementById('navigate-message').classList.add('hidden');
-    }
-  });
+    });
+  } catch (e) {
+    // Fallback: mark as unsupported
+    supportedSiteDiv.classList.add('hidden');
+    unsupportedSiteDiv.classList.remove('hidden');
+    document.getElementById('navigate-message').classList.add('hidden');
+  }
 
   // Handle export button click
   exportBtn.addEventListener('click', async () => {
@@ -189,15 +198,15 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (response && response.items && response.items.length > 0) {
           const items = response.items;
           const platform = response.platform || 'watchlist';
-          
-          // Convert to IMDB-compatible CSV
-          const csv = convertToIMDBCSV(items);
+
+          // Convert to Simple CSV (Position, Title)
+          const csv = convertToSimpleCSV(items);
           const filename = `${platform}-watchlist-${new Date().toISOString().split('T')[0]}.csv`;
-          
+
           // Download CSV
           const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
           const url = URL.createObjectURL(blob);
-          
+
           chrome.downloads.download({
             url: url,
             filename: filename,
@@ -252,47 +261,32 @@ function convertToCSV(data) {
   return csvRows.join('\n');
 }
 
-// Convert data to IMDB-compatible CSV format
-function convertToIMDBCSV(data) {
+// Convert data to Simple CSV format (used by popup export)
+function convertToSimpleCSV(data) {
   if (!data || data.length === 0) return '';
-  
-  // IMDB CSV format headers
-  const headers = ['Position', 'Const', 'Created', 'Modified', 'Description', 'Title', 'Title Type', 'Directors', 'You Rated', 'IMDb Rating', 'Runtime (mins)', 'Year', 'Genres', 'Num Votes', 'Release Date', 'URL'];
+
+  // Simple CSV format headers
+  const headers = ['Position', 'Title'];
   const csvRows = [];
-  
+
   // Add header row
   csvRows.push(headers.join(','));
-  
+
   // Add data rows
   for (let i = 0; i < data.length; i++) {
     const item = data[i];
     const position = i + 1;
-    const created = item.extractedDate || new Date().toISOString().split('T')[0];
     const title = item.title || '';
-    
-    // Build CSV row with IMDB format
+
+    // Build CSV row
     const row = [
       position,                    // Position
-      '',                          // Const (IMDB ID - not available)
-      created,                     // Created
-      created,                     // Modified
-      `From ${item.platform}`,     // Description
-      escapeCSVValue(title),       // Title
-      '',                          // Title Type (movie/tvSeries - not available)
-      '',                          // Directors
-      '',                          // You Rated
-      '',                          // IMDb Rating
-      '',                          // Runtime (mins)
-      '',                          // Year
-      '',                          // Genres
-      '',                          // Num Votes
-      '',                          // Release Date
-      ''                           // URL
+      escapeCSVValue(title)        // Title
     ];
-    
+
     csvRows.push(row.join(','));
   }
-  
+
   return csvRows.join('\n');
 }
 

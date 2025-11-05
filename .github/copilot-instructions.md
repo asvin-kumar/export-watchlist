@@ -13,7 +13,6 @@ This is a cross-browser extension (Chrome, Firefox, Safari) that extracts and ex
 ```
 export-watchlist/
 ├── manifest.json       # Extension manifest (Manifest V3)
-├── background.js       # Service worker for context menu and icon management
 ├── content.js         # Content script for extracting watchlist data
 ├── popup.html         # Extension popup UI
 ├── popup.css          # Popup styles
@@ -48,12 +47,6 @@ export-watchlist/
 
 ## Key Components
 
-### background.js (Service Worker)
-- Manages extension icon states (active on supported sites, inactive elsewhere)
-- Creates and handles context menu
-- Handles messages from popup and content scripts
-- Downloads CSV files
-- **Important**: Service workers don't have direct DOM access
 
 ### content.js (Content Script)
 - Runs on streaming platform pages
@@ -72,20 +65,17 @@ export-watchlist/
 To add a new platform, update these files in order:
 
 1. **manifest.json**:
-   - Add URL to `host_permissions`
-   - Add URL to `content_scripts.matches`
+  - Add URL to `host_permissions`
+  - Add URL to `content_scripts.matches`
 
-2. **background.js**:
-   - Add domain to `STREAMING_SITES` array
+2. **content.js**:
+  - Create new extraction function `extractPlatformNameWatchlist()`
+  - Add condition in message listener to call the function
+  - Use platform-specific DOM selectors
+  - Handle duplicates with `Set`
 
-3. **content.js**:
-   - Create new extraction function `extractPlatformNameWatchlist()`
-   - Add condition in message listener to call the function
-   - Use platform-specific DOM selectors
-   - Handle duplicates with `Set`
-
-4. **README.md** and **INSTALLATION.md**:
-   - Update supported platforms list
+3. **README.md** and **INSTALLATION.md**:
+  - Update supported platforms list
 
 ## CSV Format
 All extracted data must follow this structure:
@@ -177,7 +167,6 @@ function extractPlatformWatchlist() {
 2. **Popup UI**: Show correct content based on site support
 3. **Extraction**: Extract data from watchlist pages
 4. **CSV Export**: Download properly formatted CSV
-5. **Context Menu**: Right-click option works on supported sites
 
 ### Testing on Different Platforms
 Test on all supported streaming platforms:
@@ -226,7 +215,6 @@ Streaming sites frequently update their HTML structure. If extraction fails:
 
 ### Required Permissions
 - `activeTab`: Access current tab
-- `contextMenus`: Create right-click menu
 - `downloads`: Download CSV files
 - `scripting`: Execute content scripts
 
@@ -234,7 +222,6 @@ Streaming sites frequently update their HTML structure. If extraction fails:
 - `chrome.runtime.*`: Messaging and lifecycle
 - `chrome.tabs.*`: Tab information and management
 - `chrome.action.*`: Extension icon control
-- `chrome.contextMenus.*`: Right-click menu
 - `chrome.downloads.*`: File downloads
 
 ## Development Workflow
@@ -248,7 +235,6 @@ Streaming sites frequently update their HTML structure. If extraction fails:
 
 ### Debugging
 - Use browser DevTools console
-- Check Background Service Worker console (chrome://extensions)
 - Inspect popup with right-click → Inspect
 - Check content script console on streaming pages
 

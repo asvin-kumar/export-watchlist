@@ -16,7 +16,6 @@ A cross-browser extension (Chrome, Firefox, Safari) that extracts and exports yo
 ## Features
 
 - **One-Click Export**: Export your entire watchlist to a CSV file with a single click
-- **Context Menu**: Right-click option to export watchlist
 - **Smart Icon States**: Extension icon lights up on supported streaming sites and grays out on unsupported sites
 - **Cross-Browser Compatible**: Works on Chrome, Firefox, and Safari
 - **CSV Format**: Easy to import into spreadsheets or other services
@@ -52,10 +51,6 @@ A cross-browser extension (Chrome, Firefox, Safari) that extracts and exports yo
 4. Click "Export Watchlist" button
 5. Choose where to save the CSV file
 
-### Alternative: Context Menu
-- Right-click anywhere on a supported streaming site
-- Select "Export Watchlist to CSV" from the context menu
-
 ## Screenshots
 
 The extension features an intuitive interface with helpful guidance:
@@ -80,17 +75,15 @@ The exported CSV file includes the following columns:
 ```
 export-watchlist/
 ├── manifest.json       # Extension manifest
-├── background.js       # Service worker for context menu and icon management
 ├── content.js         # Content script for extracting watchlist data
 ├── popup.html         # Extension popup UI
 ├── popup.css          # Popup styles
-├── popup.js           # Popup functionality
-└── icons/             # Extension icons (active/inactive states)
+├── popup.js           # Popup functionality (triggers extraction & downloads)
+└── icons/             # Extension icons
 ```
 
 ### Permissions Required
 - `activeTab`: Access to the current tab
-- `contextMenus`: Add context menu options
 - `downloads`: Download CSV files
 - `scripting`: Execute scripts on streaming sites
 
