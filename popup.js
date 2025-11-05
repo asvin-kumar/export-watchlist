@@ -1,35 +1,5 @@
 // Popup script
 
-document.addEventListener('DOMContentLoaded', async () => {
-  const exportBtn = document.getElementById('export-btn');
-  const supportedSiteDiv = document.getElementById('supported-site');
-  const unsupportedSiteDiv = document.getElementById('unsupported-site');
-  const statusDiv = document.getElementById('status');
-  
-  // Check if current site is supported
-  chrome.runtime.sendMessage({ action: 'checkSite' }, (response) => {
-    if (response && response.isSupported) {
-      // Check if we're on the actual watchlist page
-      if (isOnWatchlistPage(response.url)) {
-        supportedSiteDiv.classList.remove('hidden');
-        unsupportedSiteDiv.classList.add('hidden');
-        document.getElementById('navigate-message').classList.add('hidden');
-      } else {
-        // On a streaming site but not on watchlist page
-        supportedSiteDiv.classList.add('hidden');
-        unsupportedSiteDiv.classList.add('hidden');
-        document.getElementById('navigate-message').classList.remove('hidden');
-        
-        // Update the message with platform-specific watchlist URL
-        updateNavigateMessage(response.url);
-      }
-    } else {
-      supportedSiteDiv.classList.add('hidden');
-      unsupportedSiteDiv.classList.remove('hidden');
-      document.getElementById('navigate-message').classList.add('hidden');
-    }
-  });
-  
 // Get watchlist URL for a platform
 function getWatchlistUrl(url) {
   if (!url) return null;
@@ -140,6 +110,36 @@ function isStreamingSite(url) {
     return false;
   }
 }
+
+document.addEventListener('DOMContentLoaded', async () => {
+  const exportBtn = document.getElementById('export-btn');
+  const supportedSiteDiv = document.getElementById('supported-site');
+  const unsupportedSiteDiv = document.getElementById('unsupported-site');
+  const statusDiv = document.getElementById('status');
+  
+  // Check if current site is supported
+  chrome.runtime.sendMessage({ action: 'checkSite' }, (response) => {
+    if (response && response.isSupported) {
+      // Check if we're on the actual watchlist page
+      if (isOnWatchlistPage(response.url)) {
+        supportedSiteDiv.classList.remove('hidden');
+        unsupportedSiteDiv.classList.add('hidden');
+        document.getElementById('navigate-message').classList.add('hidden');
+      } else {
+        // On a streaming site but not on watchlist page
+        supportedSiteDiv.classList.add('hidden');
+        unsupportedSiteDiv.classList.add('hidden');
+        document.getElementById('navigate-message').classList.remove('hidden');
+        
+        // Update the message with platform-specific watchlist URL
+        updateNavigateMessage(response.url);
+      }
+    } else {
+      supportedSiteDiv.classList.add('hidden');
+      unsupportedSiteDiv.classList.remove('hidden');
+      document.getElementById('navigate-message').classList.add('hidden');
+    }
+  });
 
   // Handle export button click
   exportBtn.addEventListener('click', async () => {
