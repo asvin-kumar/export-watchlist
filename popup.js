@@ -128,7 +128,7 @@ function isStreamingSite(url) {
           }
         } catch (e) {
           console.error('Error sending message to content script:', e);
-          showStatus('Error: ' + e.message, 'error');
+          showStatus('Failed to communicate with page content. Please refresh the page and try again.', 'error');
         }
       } else if (isStreamingSite(tab.url)) {
         // Not on watchlist page, load it in background
