@@ -27,7 +27,7 @@ from streaming platforms (Netflix, Prime Video, Disney+, Hulu) to IMDB-compatibl
 - Implements platform-specific selectors for Netflix, Prime Video, Hulu, Disney+
 - Handles lazy-loading by scrolling to load all content
 - Validates that user is on correct watchlist page
-- Redirects Netflix users from homepage to my-list page
+- Returns error if not on watchlist page (background script handles loading)
 
 ### background.js
 - Manages context menu (right-click export option)
@@ -52,6 +52,8 @@ from streaming platforms (Netflix, Prime Video, Disney+, Hulu) to IMDB-compatibl
 3. CSV format is IMDB-compatible with 16 columns
 4. Filenames follow pattern: {platform}-watchlist-YYYY-MM-DD.csv
 5. Automatic scrolling implemented to capture all watchlist items
+6. Background tab loading: if user is on homepage, watchlist page is loaded in a hidden background tab, data is extracted, and tab is closed automatically
+7. 2-second delay after page load ensures content is fully rendered before extraction
 
 ## Common Tasks
 - Testing: Load extension in browser developer mode and test on actual streaming sites
