@@ -28,11 +28,13 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
 // Update icon based on current tab
 chrome.tabs.onActivated.addListener(async (activeInfo) => {
   updateIcon(activeInfo.tabId);
+  updateContextMenu(activeInfo.tabId);
 });
 
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   if (changeInfo.status === 'complete') {
     updateIcon(tabId);
+    updateContextMenu(tabId);
   }
 });
 
@@ -49,6 +51,46 @@ function isStreamingSite(url) {
     );
   } catch (e) {
     return false;
+  }
+}
+
+// Function to check if URL is on a watchlist page
+function isOnWatchlistPage(url) {
+  if (!url) return false;
+  try {
+    const urlObj = new URL(url);
+    const hostname = urlObj.hostname;
+    const pathname = urlObj.pathname;
+    
+    if (hostname === 'www.netflix.com' || hostname.endsWith('.netflix.com')) {
+      return pathname.includes('/browse/my-list');
+    } else if (hostname === 'www.primevideo.com' || hostname.endsWith('.primevideo.com') || 
+               hostname === 'www.amazon.com' || hostname.endsWith('.amazon.com')) {
+      return pathname.includes('/watchlist') || pathname.includes('/wl');
+    } else if (hostname === 'www.hulu.com' || hostname.endsWith('.hulu.com')) {
+      return pathname.includes('/my-stuff');
+    } else if (hostname === 'www.disneyplus.com' || hostname.endsWith('.disneyplus.com')) {
+      return pathname.includes('/watchlist');
+    }
+    
+    return false;
+  } catch (e) {
+    return false;
+  }
+}
+
+// Update context menu based on current page
+async function updateContextMenu(tabId) {
+  try {
+    const tab = await chrome.tabs.get(tabId);
+    const isWatchlistPage = isOnWatchlistPage(tab.url);
+    
+    // Update context menu to only show on watchlist pages
+    chrome.contextMenus.update('export-watchlist', {
+      enabled: isWatchlistPage
+    });
+  } catch (e) {
+    console.error('Error updating context menu:', e);
   }
 }
 
@@ -102,18 +144,96 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 });
 
+// Get watchlist URL for a platform
+function getWatchlistUrl(url) {
+  if (!url) return null;
+  try {
+    const urlObj = new URL(url);
+    const hostname = urlObj.hostname;
+    
+    if (hostname === 'www.netflix.com' || hostname.endsWith('.netflix.com')) {
+      return 'https://www.netflix.com/browse/my-list';
+    } else if (hostname === 'www.primevideo.com' || hostname.endsWith('.primevideo.com')) {
+      return 'https://www.primevideo.com/watchlist';
+    } else if (hostname === 'www.amazon.com' || hostname.endsWith('.amazon.com')) {
+      return 'https://www.amazon.com/gp/video/watchlist';
+    } else if (hostname === 'www.hulu.com' || hostname.endsWith('.hulu.com')) {
+      return 'https://www.hulu.com/my-stuff';
+    } else if (hostname === 'www.disneyplus.com' || hostname.endsWith('.disneyplus.com')) {
+      return 'https://www.disneyplus.com/watchlist';
+    }
+    
+    return null;
+  } catch (e) {
+    return null;
+  }
+}
+
 // Export watchlist from current tab
 async function exportWatchlist(tabId) {
   try {
-    // Send message to content script to extract data
-    const response = await chrome.tabs.sendMessage(tabId, { action: 'extractWatchlist' });
+    const currentTab = await chrome.tabs.get(tabId);
+    const currentUrl = currentTab.url;
     
-    if (response && response.items && response.items.length > 0) {
-      const csv = convertToCSV(response.items);
-      const filename = `watchlist-${new Date().toISOString().split('T')[0]}.csv`;
-      downloadCSV(csv, filename);
-    } else {
-      console.log('No watchlist items found');
+    // Check if already on watchlist page
+    if (isOnWatchlistPage(currentUrl)) {
+      // Extract directly from current page
+      const response = await chrome.tabs.sendMessage(tabId, { action: 'extractWatchlist' });
+      
+      if (response && response.items && response.items.length > 0) {
+        const csv = convertToIMDBCSV(response.items);
+        const platform = response.platform || 'watchlist';
+        const filename = `${platform}-watchlist-${new Date().toISOString().split('T')[0]}.csv`;
+        downloadCSV(csv, filename);
+      } else {
+        console.log('No watchlist items found');
+      }
+    } else if (isStreamingSite(currentUrl)) {
+      // Not on watchlist page, but on a streaming site
+      // Load watchlist page in background
+      const watchlistUrl = getWatchlistUrl(currentUrl);
+      
+      if (watchlistUrl) {
+        console.log('Loading watchlist page in background:', watchlistUrl);
+        
+        // Create a new tab in the background
+        const newTab = await chrome.tabs.create({
+          url: watchlistUrl,
+          active: false // Keep it in the background
+        });
+        
+        // Wait for the tab to finish loading and for content to be extracted
+        await new Promise((resolve) => {
+          const listener = async (updatedTabId, changeInfo) => {
+            if (updatedTabId === newTab.id && changeInfo.status === 'complete') {
+              // Give it extra time to fully load content
+              setTimeout(async () => {
+                try {
+                  const response = await chrome.tabs.sendMessage(newTab.id, { action: 'extractWatchlist' });
+                  
+                  if (response && response.items && response.items.length > 0) {
+                    const csv = convertToIMDBCSV(response.items);
+                    const platform = response.platform || 'watchlist';
+                    const filename = `${platform}-watchlist-${new Date().toISOString().split('T')[0]}.csv`;
+                    downloadCSV(csv, filename);
+                  } else {
+                    console.log('No watchlist items found');
+                  }
+                } catch (e) {
+                  console.error('Error extracting from background tab:', e);
+                } finally {
+                  // Close the background tab
+                  chrome.tabs.remove(newTab.id);
+                  chrome.tabs.onUpdated.removeListener(listener);
+                  resolve();
+                }
+              }, 2000); // Wait 2 seconds after page loads
+            }
+          };
+          
+          chrome.tabs.onUpdated.addListener(listener);
+        });
+      }
     }
   } catch (e) {
     console.error('Error exporting watchlist:', e);
@@ -144,6 +264,60 @@ function convertToCSV(data) {
   }
   
   return csvRows.join('\n');
+}
+
+// Convert data to IMDB-compatible CSV format
+function convertToIMDBCSV(data) {
+  if (!data || data.length === 0) return '';
+  
+  // IMDB CSV format headers
+  const headers = ['Position', 'Const', 'Created', 'Modified', 'Description', 'Title', 'Title Type', 'Directors', 'You Rated', 'IMDb Rating', 'Runtime (mins)', 'Year', 'Genres', 'Num Votes', 'Release Date', 'URL'];
+  const csvRows = [];
+  
+  // Add header row
+  csvRows.push(headers.join(','));
+  
+  // Add data rows
+  for (let i = 0; i < data.length; i++) {
+    const item = data[i];
+    const position = i + 1;
+    const created = item.extractedDate || new Date().toISOString().split('T')[0];
+    const title = item.title || '';
+    
+    // Build CSV row with IMDB format
+    const row = [
+      position,                    // Position
+      '',                          // Const (IMDB ID - not available)
+      created,                     // Created
+      created,                     // Modified
+      `From ${item.platform}`,     // Description
+      escapeCSVValue(title),       // Title
+      '',                          // Title Type (movie/tvSeries - not available)
+      '',                          // Directors
+      '',                          // You Rated
+      '',                          // IMDb Rating
+      '',                          // Runtime (mins)
+      '',                          // Year
+      '',                          // Genres
+      '',                          // Num Votes
+      '',                          // Release Date
+      ''                           // URL
+    ];
+    
+    csvRows.push(row.join(','));
+  }
+  
+  return csvRows.join('\n');
+}
+
+// Escape CSV value
+function escapeCSVValue(value) {
+  if (!value) return '';
+  const stringValue = String(value);
+  const escaped = stringValue.replace(/"/g, '""');
+  return escaped.includes(',') || escaped.includes('"') || escaped.includes('\n') 
+    ? `"${escaped}"` 
+    : escaped;
 }
 
 // Download CSV file
