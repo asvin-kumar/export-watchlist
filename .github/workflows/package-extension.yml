@@ -1,0 +1,29 @@
+name: Package Chrome extension on PR merge
+
+on:
+  pull_request:
+    types: [closed]
+
+jobs:
+  package:
+    if: ${{ github.event.pull_request.merged == true }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Create extension zip
+        run: |
+          set -e
+          ZIP_NAME="extension-${{ github.event.pull_request.number }}-${{ github.sha }}.zip"
+          # Exclude GitHub workflows and .git directory from the packaged zip
+          zip -r "$ZIP_NAME" . -x ".github/*" ".git/*" "screenshots/*"
+          echo "Created $ZIP_NAME"
+
+      - name: Upload extension artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: extension-${{ github.event.pull_request.number }}-${{ github.sha }}.zip
+          path: extension-${{ github.event.pull_request.number }}-${{ github.sha }}.zip
