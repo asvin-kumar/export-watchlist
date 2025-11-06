@@ -162,22 +162,33 @@ function parseCSV(csvText) {
   if (lines.length === 0) return [];
   
   const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
-  const titleIndex = headers.findIndex(h => h === 'title' || h === 'position');
+  const titleIndex = headers.findIndex(h => h === 'title');
   
   if (titleIndex === -1) {
-    // If no header found, assume first column is title
-    return lines.slice(1).map(line => {
-      const values = line.split(',');
-      return values[0]?.trim().replace(/^"|"$/g, '');
-    }).filter(Boolean);
+    // If no "title" header found, check if there's a "position" header
+    // If so, title is in the second column, otherwise assume first column is title
+    const positionIndex = headers.findIndex(h => h === 'position');
+    if (positionIndex === 0) {
+      // Position,Title format
+      return lines.slice(1).map(line => {
+        const values = line.split(',');
+        return values[1]?.trim().replace(/^"|"$/g, '');
+      }).filter(Boolean);
+    } else {
+      // Assume first column is title
+      return lines.slice(1).map(line => {
+        const values = line.split(',');
+        return values[0]?.trim().replace(/^"|"$/g, '');
+      }).filter(Boolean);
+    }
   }
   
-  // Parse with headers
+  // Parse with title header
   const titles = [];
   for (let i = 1; i < lines.length; i++) {
     const values = lines[i].split(',');
     if (values.length > titleIndex) {
-      const title = values[titleIndex === 0 ? 1 : titleIndex]?.trim().replace(/^"|"$/g, '');
+      const title = values[titleIndex]?.trim().replace(/^"|"$/g, '');
       if (title) titles.push(title);
     }
   }
