@@ -26,6 +26,9 @@ function isOnStreamingPage(url) {
       return true;
     } else if (hostname === 'www.paramountplus.com' || hostname.endsWith('.paramountplus.com')) {
       return true;
+    } else if (hostname === 'www.imdb.com' || hostname.endsWith('.imdb.com')) {
+      // Check if on IMDB list edit page
+      return pathname.includes('/list/');
     }
 
     return false;

@@ -44,7 +44,16 @@
 3. Click "Export Watchlist"
 4. ✓ A CSV file should download containing your watchlist items
 
-### Test 4: Context Menu
+### Test 4: IMDB Import
+1. Go to IMDB.com and navigate to any list (or create a new list)
+2. Click "Edit" to enter edit mode
+3. Click the extension icon
+4. ✓ You should see a CSV upload interface
+5. Upload a CSV file with movie titles
+6. Click "Import to IMDB List"
+7. ✓ The extension should search for each title and add matching items to your IMDB list
+
+### Test 5: Context Menu
 1. Navigate to a supported streaming site
 2. Right-click anywhere on the page
 3. ✓ You should see "Export Watchlist to CSV" in the context menu
@@ -53,6 +62,7 @@
 
 ## Supported Streaming Platforms
 
+### Export Watchlists:
 - **Netflix**: www.netflix.com
 - **Prime Video**: www.primevideo.com, www.amazon.com
 - **Disney+**: www.disneyplus.com
@@ -62,14 +72,20 @@
 - **Peacock**: www.peacocktv.com
 - **Paramount+**: www.paramountplus.com
 
+### Import Watchlists:
+- **IMDB Lists**: www.imdb.com (when in edit mode on a list page)
+
 ## Expected CSV Output
 
 The CSV file will have the following columns:
 ```
-title,type,platform,imageUrl,extractedDate
-"Stranger Things","Movie/Show","Netflix","https://...","2025-11-05"
-"The Crown","Movie/Show","Netflix","https://...","2025-11-05"
+Position,Title
+1,"Stranger Things"
+2,"The Crown"
+3,"Breaking Bad"
 ```
+
+This simple format is perfect for importing into IMDB or other services.
 
 ## Troubleshooting
 

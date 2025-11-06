@@ -4,6 +4,7 @@ A cross-browser extension (Chrome, Firefox, Safari) that extracts and exports yo
 
 ## Supported Streaming Platforms
 
+### Export Watchlists From:
 - Netflix
 - Prime Video (Amazon)
 - Disney+
@@ -13,9 +14,15 @@ A cross-browser extension (Chrome, Firefox, Safari) that extracts and exports yo
 - Peacock
 - Paramount+
 
+### Import Watchlists To:
+- IMDB Lists
+
 ## Features
 
 - **One-Click Export**: Export your entire watchlist to a CSV file with a single click
+- **CSV Import to IMDB**: Upload a CSV file with movie titles to automatically add them to your IMDB list
+- **Smart Title Search**: Automatically searches IMDB for each title and finds matching content
+- **Batch Import**: Add multiple movies/shows to your IMDB list at once
 - **Smart Icon States**: Extension icon lights up on supported streaming sites and grays out on unsupported sites
 - **Cross-Browser Compatible**: Works on Chrome, Firefox, and Safari
 - **CSV Format**: Easy to import into spreadsheets or other services
@@ -45,11 +52,30 @@ A cross-browser extension (Chrome, Firefox, Safari) that extracts and exports yo
 
 ## How to Use
 
+### Exporting Watchlists
+
 1. Navigate to one of the supported streaming platforms (Netflix, Prime Video, Disney+, Hulu, Apple TV+, Max, Peacock, or Paramount+)
 2. Go to your watchlist/My List page
 3. Click the extension icon in your browser toolbar
 4. Click "Export Watchlist" button
 5. Choose where to save the CSV file
+
+### Importing to IMDB Lists
+
+1. Navigate to IMDB and go to any list page (or create a new list)
+2. Click "Edit" to enter edit mode for the list
+3. Click the extension icon in your browser toolbar
+4. Upload your CSV file containing movie/show titles
+5. Click "Import to IMDB List" button
+6. The extension will:
+   - Search IMDB for each title in your CSV
+   - Find matching content IDs
+   - Automatically add them to your current IMDB list
+
+**CSV Format for Import**: Your CSV file should have either:
+- A "Title" column with movie/show names
+- Or a "Position" column followed by title names
+- The extension will automatically detect the format
 
 ## Screenshots
 
@@ -63,11 +89,10 @@ See the [`screenshots/`](screenshots/) folder for detailed UI examples that can 
 ## CSV Output Format
 
 The exported CSV file includes the following columns:
-- **title**: Name of the movie or TV show
-- **type**: Type of content (Movie/Show)
-- **platform**: Streaming platform name
-- **imageUrl**: URL to the content's thumbnail image
-- **extractedDate**: Date when the data was extracted
+- **Position**: Position number in the watchlist (1, 2, 3, ...)
+- **Title**: Name of the movie or TV show
+
+**Note**: When exporting from streaming platforms, the CSV uses a simple format with Position and Title columns, perfect for importing to IMDB or other services.
 
 ## Development
 

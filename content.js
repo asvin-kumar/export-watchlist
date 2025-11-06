@@ -56,9 +56,219 @@ function getPlatformName() {
     return 'peacock';
   } else if (hostname === 'www.paramountplus.com' || hostname.endsWith('.paramountplus.com')) {
     return 'paramount';
+  } else if (hostname === 'www.imdb.com' || hostname.endsWith('.imdb.com')) {
+    return 'imdb';
   }
   
   return 'watchlist';
+}
+
+// IMDB import functionality
+async function getIMDBAWSKey() {
+  // Extract AWS credentials from IMDB page
+  // IMDB typically includes AWS credentials in page scripts or configs
+  try {
+    // Look for Next.js data or inline scripts with AWS config
+    const scripts = document.querySelectorAll('script');
+    for (const script of scripts) {
+      const content = script.textContent;
+      // Search for AWS credentials pattern (this may vary)
+      if (content.includes('AWS') || content.includes('aws')) {
+        // Try to extract credentials from script content
+        const credMatch = content.match(/["'](?:AWS_)?ACCESS_KEY["']:\s*["']([^"']+)["']/i);
+        if (credMatch) {
+          return credMatch[1];
+        }
+      }
+    }
+    
+    // Alternative: Use IMDB's own search API endpoint without explicit AWS key
+    // IMDB's search is accessible through their public endpoints
+    return null; // Will use IMDB's public search endpoint instead
+  } catch (e) {
+    console.error('Error getting AWS key:', e);
+    return null;
+  }
+}
+
+async function searchIMDBTitle(title) {
+  // Search IMDB for a title and return content IDs
+  // Note: This uses IMDB's public suggestion API which may change without notice.
+  // If this endpoint stops working, alternative scraping methods may be needed.
+  try {
+    const searchQuery = encodeURIComponent(title);
+    const response = await fetch(`https://v3.sg.media-imdb.com/suggestion/x/${searchQuery}.json`);
+    
+    if (!response.ok) {
+      // API endpoint may have changed or be unavailable
+      console.warn(`IMDB search API returned status ${response.status} for "${title}"`);
+      throw new Error('IMDB search failed - API may have changed');
+    }
+    
+    const data = await response.json();
+    
+    // Extract all matching IDs (as per requirements: keep all if multiple)
+    // Note: This will add ALL matches found. For better accuracy, consider
+    // filtering by type (movie vs TV) or year if available in CSV.
+    const contentIds = [];
+    if (data.d && Array.isArray(data.d)) {
+      for (const item of data.d) {
+        if (item.id) {
+          contentIds.push({
+            id: item.id,
+            title: item.l || title,
+            year: item.y || '',
+            type: item.q || 'unknown'
+          });
+        }
+      }
+    }
+    
+    return contentIds;
+  } catch (e) {
+    console.error(`Error searching for "${title}":`, e);
+    return [];
+  }
+}
+
+async function addToIMDBList(contentId) {
+  // Add a content ID to the current IMDB list
+  try {
+    // Get list ID from URL
+    const listMatch = window.location.pathname.match(/\/list\/(ls\d+)/);
+    if (!listMatch) {
+      throw new Error('Could not determine list ID from URL');
+    }
+    const listId = listMatch[1];
+    
+    // Get CSRF token from page using multiple fallback selectors
+    // Note: IMDB's CSRF field name (49e6c) is a hardcoded value that may change.
+    // We try multiple methods to find it.
+    let csrfToken = null;
+    
+    // Method 1: Try common IMDB CSRF field name
+    const csrfInput = document.querySelector('input[name="49e6c"]');
+    if (csrfInput) {
+      csrfToken = csrfInput.value;
+    }
+    
+    // Method 2: Try meta tag
+    if (!csrfToken) {
+      const csrfMeta = document.querySelector('meta[name="csrf-token"]');
+      if (csrfMeta) csrfToken = csrfMeta.content;
+    }
+    
+    // Method 3: Try cookie
+    if (!csrfToken) {
+      csrfToken = getCookie('csrftoken') || getCookie('csrf_token');
+    }
+    
+    // Method 4: Try to find any input with "csrf" in the name
+    if (!csrfToken) {
+      const anyCSRF = document.querySelector('input[name*="csrf" i]');
+      if (anyCSRF) csrfToken = anyCSRF.value;
+    }
+    
+    if (!csrfToken) {
+      console.warn('CSRF token not found using any method - request may fail');
+    }
+    
+    // Make request to add item to list
+    const formData = new FormData();
+    formData.append('const', contentId);
+    formData.append('list_id', listId);
+    if (csrfToken) {
+      formData.append('49e6c', csrfToken);
+    }
+    
+    const response = await fetch('/list/_ajax/edit', {
+      method: 'POST',
+      body: formData,
+      headers: {
+        'X-Requested-With': 'XMLHttpRequest'
+      }
+    });
+    
+    if (!response.ok) {
+      throw new Error('Failed to add item to list');
+    }
+    
+    return true;
+  } catch (e) {
+    console.error(`Error adding content ID ${contentId} to list:`, e);
+    return false;
+  }
+}
+
+function getCookie(name) {
+  const value = `; ${document.cookie}`;
+  const parts = value.split(`; ${name}=`);
+  if (parts.length === 2) return parts.pop().split(';').shift();
+  return null;
+}
+
+async function importTitlesToIMDB(titles) {
+  const results = {
+    total: titles.length,
+    processed: 0,
+    added: 0,
+    failed: 0,
+    errors: []
+  };
+  
+  // Note: Per requirements, we keep ALL matching results for each title.
+  // This means if a search returns multiple matches, all will be added to the list.
+  // Users should be aware this may add duplicate or similar titles.
+  
+  for (const title of titles) {
+    try {
+      // Search for the title
+      const contentIds = await searchIMDBTitle(title);
+      
+      if (contentIds.length === 0) {
+        results.failed++;
+        results.errors.push(`No results found for: ${title}`);
+        console.warn(`No IMDB results for: ${title}`);
+        continue;
+      }
+      
+      // Log how many matches were found for transparency
+      if (contentIds.length > 1) {
+        console.log(`Found ${contentIds.length} matches for "${title}", adding all...`);
+      }
+      
+      // Add all matching content IDs to the list (as per requirements)
+      let addedAny = false;
+      for (const content of contentIds) {
+        const success = await addToIMDBList(content.id);
+        if (success) {
+          addedAny = true;
+          results.added++;
+          console.log(`Added: ${content.title} (${content.id})`);
+        }
+        
+        // Reduced delay - only wait between items, not between all operations
+        // If rate limiting becomes an issue, IMDB will return errors and we can increase
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+      
+      if (!addedAny) {
+        results.failed++;
+        results.errors.push(`Failed to add: ${title}`);
+      }
+      
+      results.processed++;
+      
+      // Slightly longer delay between different titles to avoid overwhelming the API
+      await new Promise(resolve => setTimeout(resolve, 200));
+    } catch (e) {
+      results.failed++;
+      results.errors.push(`Error processing "${title}": ${e.message}`);
+      console.error(`Error processing "${title}":`, e);
+    }
+  }
+  
+  return results;
 }
 
 // Constants for scroll behavior
@@ -458,6 +668,38 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         error: true,
         message: error.message,
         items: [] 
+      });
+    });
+    
+    return true; // Keep message channel open for async response
+  } else if (request.action === 'importToIMDB') {
+    // Handle IMDB import
+    const importPromise = (async () => {
+      try {
+        const results = await importTitlesToIMDB(request.titles);
+        return {
+          success: true,
+          addedCount: results.added,
+          failedCount: results.failed,
+          results: results
+        };
+      } catch (error) {
+        return {
+          success: false,
+          error: true,
+          message: error.message
+        };
+      }
+    })();
+    
+    importPromise.then(result => {
+      sendResponse(result);
+    }).catch(error => {
+      console.error('Error importing to IMDB:', error);
+      sendResponse({
+        success: false,
+        error: true,
+        message: error.message
       });
     });
     

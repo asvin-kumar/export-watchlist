@@ -17,7 +17,8 @@
     "https://tv.apple.com/*",
     "https://play.max.com/*",
     "https://www.peacocktv.com/*",
-    "https://www.paramountplus.com/*"
+    "https://www.paramountplus.com/*",
+    "https://www.imdb.com/*"
   ],
     "background": {
       "service_worker": "background.js"
@@ -46,7 +47,8 @@
         "https://tv.apple.com/*",
         "https://play.max.com/*",
         "https://www.peacocktv.com/*",
-        "https://www.paramountplus.com/*"
+        "https://www.paramountplus.com/*",
+        "https://www.imdb.com/*"
       ],
       "js": ["content.js"],
       "run_at": "document_idle"
