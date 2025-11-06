@@ -93,18 +93,23 @@ async function getIMDBAWSKey() {
 
 async function searchIMDBTitle(title) {
   // Search IMDB for a title and return content IDs
+  // Note: This uses IMDB's public suggestion API which may change without notice.
+  // If this endpoint stops working, alternative scraping methods may be needed.
   try {
-    // Use IMDB's suggestion API (publicly accessible)
     const searchQuery = encodeURIComponent(title);
     const response = await fetch(`https://v3.sg.media-imdb.com/suggestion/x/${searchQuery}.json`);
     
     if (!response.ok) {
-      throw new Error('IMDB search failed');
+      // API endpoint may have changed or be unavailable
+      console.warn(`IMDB search API returned status ${response.status} for "${title}"`);
+      throw new Error('IMDB search failed - API may have changed');
     }
     
     const data = await response.json();
     
-    // Extract all matching IDs
+    // Extract all matching IDs (as per requirements: keep all if multiple)
+    // Note: This will add ALL matches found. For better accuracy, consider
+    // filtering by type (movie vs TV) or year if available in CSV.
     const contentIds = [];
     if (data.d && Array.isArray(data.d)) {
       for (const item of data.d) {
@@ -136,13 +141,36 @@ async function addToIMDBList(contentId) {
     }
     const listId = listMatch[1];
     
-    // Get CSRF token from page
-    const csrfToken = document.querySelector('input[name="49e6c"]')?.value || 
-                      document.querySelector('meta[name="csrf-token"]')?.content ||
-                      getCookie('csrftoken');
+    // Get CSRF token from page using multiple fallback selectors
+    // Note: IMDB's CSRF field name (49e6c) is a hardcoded value that may change.
+    // We try multiple methods to find it.
+    let csrfToken = null;
+    
+    // Method 1: Try common IMDB CSRF field name
+    const csrfInput = document.querySelector('input[name="49e6c"]');
+    if (csrfInput) {
+      csrfToken = csrfInput.value;
+    }
+    
+    // Method 2: Try meta tag
+    if (!csrfToken) {
+      const csrfMeta = document.querySelector('meta[name="csrf-token"]');
+      if (csrfMeta) csrfToken = csrfMeta.content;
+    }
+    
+    // Method 3: Try cookie
+    if (!csrfToken) {
+      csrfToken = getCookie('csrftoken') || getCookie('csrf_token');
+    }
+    
+    // Method 4: Try to find any input with "csrf" in the name
+    if (!csrfToken) {
+      const anyCSRF = document.querySelector('input[name*="csrf" i]');
+      if (anyCSRF) csrfToken = anyCSRF.value;
+    }
     
     if (!csrfToken) {
-      console.warn('CSRF token not found, attempting without it');
+      console.warn('CSRF token not found using any method - request may fail');
     }
     
     // Make request to add item to list
@@ -188,6 +216,10 @@ async function importTitlesToIMDB(titles) {
     errors: []
   };
   
+  // Note: Per requirements, we keep ALL matching results for each title.
+  // This means if a search returns multiple matches, all will be added to the list.
+  // Users should be aware this may add duplicate or similar titles.
+  
   for (const title of titles) {
     try {
       // Search for the title
@@ -200,7 +232,12 @@ async function importTitlesToIMDB(titles) {
         continue;
       }
       
-      // Add all matching content IDs to the list
+      // Log how many matches were found for transparency
+      if (contentIds.length > 1) {
+        console.log(`Found ${contentIds.length} matches for "${title}", adding all...`);
+      }
+      
+      // Add all matching content IDs to the list (as per requirements)
       let addedAny = false;
       for (const content of contentIds) {
         const success = await addToIMDBList(content.id);
@@ -210,8 +247,9 @@ async function importTitlesToIMDB(titles) {
           console.log(`Added: ${content.title} (${content.id})`);
         }
         
-        // Small delay to avoid rate limiting
-        await new Promise(resolve => setTimeout(resolve, 300));
+        // Reduced delay - only wait between items, not between all operations
+        // If rate limiting becomes an issue, IMDB will return errors and we can increase
+        await new Promise(resolve => setTimeout(resolve, 100));
       }
       
       if (!addedAny) {
@@ -220,6 +258,9 @@ async function importTitlesToIMDB(titles) {
       }
       
       results.processed++;
+      
+      // Slightly longer delay between different titles to avoid overwhelming the API
+      await new Promise(resolve => setTimeout(resolve, 200));
     } catch (e) {
       results.failed++;
       results.errors.push(`Error processing "${title}": ${e.message}`);

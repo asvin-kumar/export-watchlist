@@ -156,29 +156,56 @@ function isStreamingSite(url) {
   }
 }
 
-// Parse CSV file
+// Parse CSV file - supports RFC 4180 format with quoted fields
 function parseCSV(csvText) {
   const lines = csvText.trim().split('\n');
   if (lines.length === 0) return [];
   
-  const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+  // Simple CSV parser that handles quoted fields with commas
+  function parseCSVLine(line) {
+    const result = [];
+    let current = '';
+    let inQuotes = false;
+    
+    for (let i = 0; i < line.length; i++) {
+      const char = line[i];
+      
+      if (char === '"') {
+        // Handle escaped quotes ("")
+        if (inQuotes && line[i + 1] === '"') {
+          current += '"';
+          i++; // Skip next quote
+        } else {
+          inQuotes = !inQuotes;
+        }
+      } else if (char === ',' && !inQuotes) {
+        result.push(current.trim());
+        current = '';
+      } else {
+        current += char;
+      }
+    }
+    result.push(current.trim());
+    return result;
+  }
+  
+  const headers = parseCSVLine(lines[0]).map(h => h.toLowerCase());
   const titleIndex = headers.findIndex(h => h === 'title');
   
   if (titleIndex === -1) {
     // If no "title" header found, check if there's a "position" header
-    // If so, title is in the second column, otherwise assume first column is title
     const positionIndex = headers.findIndex(h => h === 'position');
     if (positionIndex === 0) {
       // Position,Title format
       return lines.slice(1).map(line => {
-        const values = line.split(',');
-        return values[1]?.trim().replace(/^"|"$/g, '');
+        const values = parseCSVLine(line);
+        return values[1];
       }).filter(Boolean);
     } else {
       // Assume first column is title
       return lines.slice(1).map(line => {
-        const values = line.split(',');
-        return values[0]?.trim().replace(/^"|"$/g, '');
+        const values = parseCSVLine(line);
+        return values[0];
       }).filter(Boolean);
     }
   }
@@ -186,10 +213,9 @@ function parseCSV(csvText) {
   // Parse with title header
   const titles = [];
   for (let i = 1; i < lines.length; i++) {
-    const values = lines[i].split(',');
-    if (values.length > titleIndex) {
-      const title = values[titleIndex]?.trim().replace(/^"|"$/g, '');
-      if (title) titles.push(title);
+    const values = parseCSVLine(lines[i]);
+    if (values.length > titleIndex && values[titleIndex]) {
+      titles.push(values[titleIndex]);
     }
   }
   
