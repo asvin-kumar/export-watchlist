@@ -86,6 +86,27 @@ function updateNavigateMessage(url) {
   }
 }
 
+// Check if URL is on IMDB list edit page
+function isOnIMDBListEditPage(url) {
+  if (!url) return false;
+  try {
+    const urlObj = new URL(url);
+    const hostname = urlObj.hostname;
+    const pathname = urlObj.pathname;
+    const searchParams = urlObj.searchParams;
+    
+    // Check if on IMDB domain and in list edit mode
+    if (hostname === 'www.imdb.com' || hostname.endsWith('.imdb.com')) {
+      // List edit pages typically have /list/ path and edit parameter
+      return pathname.includes('/list/') && (searchParams.has('edit') || pathname.includes('/edit'));
+    }
+    
+    return false;
+  } catch (e) {
+    return false;
+  }
+}
+
 // Check if URL is on a watchlist page
 function isOnWatchlistPage(url) {
   if (!url) return false;
@@ -135,11 +156,46 @@ function isStreamingSite(url) {
   }
 }
 
+// Parse CSV file
+function parseCSV(csvText) {
+  const lines = csvText.trim().split('\n');
+  if (lines.length === 0) return [];
+  
+  const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+  const titleIndex = headers.findIndex(h => h === 'title' || h === 'position');
+  
+  if (titleIndex === -1) {
+    // If no header found, assume first column is title
+    return lines.slice(1).map(line => {
+      const values = line.split(',');
+      return values[0]?.trim().replace(/^"|"$/g, '');
+    }).filter(Boolean);
+  }
+  
+  // Parse with headers
+  const titles = [];
+  for (let i = 1; i < lines.length; i++) {
+    const values = lines[i].split(',');
+    if (values.length > titleIndex) {
+      const title = values[titleIndex === 0 ? 1 : titleIndex]?.trim().replace(/^"|"$/g, '');
+      if (title) titles.push(title);
+    }
+  }
+  
+  return titles;
+}
+
 document.addEventListener('DOMContentLoaded', async () => {
   const exportBtn = document.getElementById('export-btn');
+  const importBtn = document.getElementById('import-btn');
+  const csvUpload = document.getElementById('csv-upload');
   const supportedSiteDiv = document.getElementById('supported-site');
+  const imdbImportDiv = document.getElementById('imdb-import');
   const unsupportedSiteDiv = document.getElementById('unsupported-site');
   const statusDiv = document.getElementById('status');
+  const importStatusDiv = document.getElementById('import-status');
+  
+  let uploadedTitles = [];
   
   // Check if current site is supported by querying the active tab directly
   try {
@@ -147,15 +203,24 @@ document.addEventListener('DOMContentLoaded', async () => {
       const tab = tabs && tabs[0];
       const url = tab?.url || '';
       const supported = isStreamingSite(url);
+      const isIMDBEdit = isOnIMDBListEditPage(url);
 
-      if (supported) {
+      if (isIMDBEdit) {
+        // Show IMDB import UI
+        supportedSiteDiv.classList.add('hidden');
+        imdbImportDiv.classList.remove('hidden');
+        unsupportedSiteDiv.classList.add('hidden');
+        document.getElementById('navigate-message').classList.add('hidden');
+      } else if (supported) {
         if (isOnWatchlistPage(url)) {
           supportedSiteDiv.classList.remove('hidden');
+          imdbImportDiv.classList.add('hidden');
           unsupportedSiteDiv.classList.add('hidden');
           document.getElementById('navigate-message').classList.add('hidden');
         } else {
           // On a streaming site but not on watchlist page
           supportedSiteDiv.classList.add('hidden');
+          imdbImportDiv.classList.add('hidden');
           unsupportedSiteDiv.classList.add('hidden');
           document.getElementById('navigate-message').classList.remove('hidden');
           // Update the message with platform-specific watchlist URL
@@ -163,6 +228,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
       } else {
         supportedSiteDiv.classList.add('hidden');
+        imdbImportDiv.classList.add('hidden');
         unsupportedSiteDiv.classList.remove('hidden');
         document.getElementById('navigate-message').classList.add('hidden');
       }
@@ -170,9 +236,88 @@ document.addEventListener('DOMContentLoaded', async () => {
   } catch (e) {
     // Fallback: mark as unsupported
     supportedSiteDiv.classList.add('hidden');
+    imdbImportDiv.classList.add('hidden');
     unsupportedSiteDiv.classList.remove('hidden');
     document.getElementById('navigate-message').classList.add('hidden');
   }
+
+  // Handle CSV file upload
+  csvUpload.addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (!file) {
+      uploadedTitles = [];
+      importBtn.disabled = true;
+      return;
+    }
+    
+    try {
+      const text = await file.text();
+      uploadedTitles = parseCSV(text);
+      
+      if (uploadedTitles.length > 0) {
+        importBtn.disabled = false;
+        showImportStatus(`${uploadedTitles.length} titles loaded from CSV`, 'info');
+      } else {
+        importBtn.disabled = true;
+        showImportStatus('No valid titles found in CSV', 'error');
+      }
+    } catch (error) {
+      console.error('Error reading CSV:', error);
+      showImportStatus('Error reading CSV file: ' + error.message, 'error');
+      importBtn.disabled = true;
+    }
+  });
+
+  // Handle import button click
+  importBtn.addEventListener('click', async () => {
+    if (uploadedTitles.length === 0) {
+      showImportStatus('Please upload a CSV file first', 'error');
+      return;
+    }
+    
+    importBtn.disabled = true;
+    importBtn.textContent = 'Importing...';
+    
+    showImportStatus(`Processing ${uploadedTitles.length} titles...`, 'info');
+    
+    try {
+      // Get active tab
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      
+      // Check if on IMDB list edit page
+      if (!isOnIMDBListEditPage(tab.url)) {
+        showImportStatus('Please navigate to IMDB list edit page first.', 'error');
+        importBtn.disabled = false;
+        importBtn.textContent = 'Import to IMDB List';
+        return;
+      }
+      
+      // Send titles to content script for processing
+      try {
+        const response = await chrome.tabs.sendMessage(tab.id, { 
+          action: 'importToIMDB',
+          titles: uploadedTitles
+        });
+        
+        if (response && response.success) {
+          showImportStatus(`Successfully imported ${response.addedCount || uploadedTitles.length} titles!`, 'success');
+        } else if (response && response.error) {
+          showImportStatus('Error: ' + response.message, 'error');
+        } else {
+          showImportStatus('Import completed with some issues. Check console for details.', 'error');
+        }
+      } catch (e) {
+        console.error('Error sending message to content script:', e);
+        showImportStatus('Failed to communicate with page. Please refresh and try again.', 'error');
+      }
+    } catch (error) {
+      console.error('Error:', error);
+      showImportStatus('Error: ' + error.message, 'error');
+    } finally {
+      importBtn.disabled = false;
+      importBtn.textContent = 'Import to IMDB List';
+    }
+  });
 
   // Handle export button click
   exportBtn.addEventListener('click', async () => {
@@ -306,4 +451,12 @@ function showStatus(message, type) {
   statusDiv.textContent = message;
   statusDiv.className = `status ${type}`;
   statusDiv.classList.remove('hidden');
+}
+
+// Show import status message
+function showImportStatus(message, type) {
+  const importStatusDiv = document.getElementById('import-status');
+  importStatusDiv.textContent = message;
+  importStatusDiv.className = `status ${type}`;
+  importStatusDiv.classList.remove('hidden');
 }

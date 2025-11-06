@@ -155,3 +155,25 @@ h1 {
   line-height: 1.5;
   font-style: italic;
 }
+
+.file-input {
+  width: 100%;
+  padding: 8px;
+  margin-bottom: 12px;
+  border: 2px dashed #d1d5db;
+  border-radius: 6px;
+  background-color: #f9fafb;
+  font-size: 13px;
+  cursor: pointer;
+  transition: border-color 0.2s;
+}
+
+.file-input:hover {
+  border-color: #9ca3af;
+}
+
+.file-input:focus {
+  outline: none;
+  border-color: #2563eb;
+  background-color: #ffffff;
+}
