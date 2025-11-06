@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Watchlist Exporter",
-  "version": "0.0.0.1",
-  "description": "Export your watchlists from Netflix, Prime Video, Disney+, Hulu and other streaming services to CSV",
+  "version": "0.0.0.2",
+  "description": "Export watchlists from streaming services.",
   "permissions": [
     "activeTab",
     "downloads",
