@@ -244,7 +244,6 @@ Streaming sites frequently update their HTML structure. If extraction fails:
 - Background scripts are service workers (no DOM access)
 - Service workers can be terminated - don't rely on persistent state
 - Use `chrome.action` instead of `chrome.browserAction`
-- `executeScript` is now in `chrome.scripting` namespace
 
 ### DOM Extraction Challenges
 - Streaming sites use dynamic class names
